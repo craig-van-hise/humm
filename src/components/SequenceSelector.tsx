@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit3, Trash2, RotateCcw, Activity, Music } from 'lucide-react';
+import { Plus, Edit3, Trash2, RotateCcw, Activity, Music, Sliders } from 'lucide-react';
 import { BreathModeId, BreathMode } from '../types';
 
 export interface SequencePreset {
@@ -73,6 +73,7 @@ export interface SequenceSelectorProps {
   onEditPreset: (updatedPreset: SequencePreset) => void;
   onDeletePreset: (id: string) => void;
   onResetDefaults: () => void;
+  onOpenTimingModal?: () => void;
 }
 
 export const SequenceSelector: React.FC<SequenceSelectorProps> = ({
@@ -85,6 +86,7 @@ export const SequenceSelector: React.FC<SequenceSelectorProps> = ({
   onEditPreset,
   onDeletePreset,
   onResetDefaults,
+  onOpenTimingModal,
 }) => {
   const [mode, setMode] = useState<'idle' | 'add' | 'edit'>('idle');
   const [formName, setFormName] = useState('');
@@ -130,10 +132,21 @@ export const SequenceSelector: React.FC<SequenceSelectorProps> = ({
     <div className="w-full max-w-lg mx-auto my-3 space-y-4">
       {/* Breath Pacing Protocols */}
       <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2.5 flex items-center gap-1.5">
-          <Activity className="w-4 h-4 text-cyan-400" />
-          Breath Pacing Protocol
-        </h3>
+        <div className="flex justify-between items-center mb-2.5">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+            <Activity className="w-4 h-4 text-cyan-400" />
+            Breath Pacing Protocol
+          </h3>
+          {onOpenTimingModal && (
+            <button
+              onClick={onOpenTimingModal}
+              className="flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 font-medium cursor-pointer transition-colors"
+            >
+              <Sliders className="w-3.5 h-3.5" />
+              Custom Timing
+            </button>
+          )}
+        </div>
         <div className="grid grid-cols-3 gap-2">
           {DEFAULT_BREATH_MODES.map((bMode) => {
             const isSelected = selectedBreathMode === bMode.id;

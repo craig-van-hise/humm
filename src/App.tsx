@@ -10,6 +10,7 @@ import { BreathRing } from './components/BreathRing';
 import { PianoKeyboard } from './components/PianoKeyboard';
 import { PitchPicker } from './components/PitchPicker';
 import { AudioControls } from './components/AudioControls';
+import { TimingSettingsModal, TimingSettings } from './components/TimingSettingsModal';
 import { useAudioEngine } from './hooks/useAudioEngine';
 import { usePersistentState } from './hooks/usePersistentState';
 import { useWakeLock } from './hooks/useWakeLock';
@@ -31,7 +32,27 @@ export function App() {
   const [presets, setPresets] = usePersistentState<SequencePreset[]>('presets', DEFAULT_SEQUENCE_PRESETS);
   const [selectedPresetId, setSelectedPresetId] = usePersistentState<string>('selectedPresetId', DEFAULT_SEQUENCE_PRESETS[0].id);
 
+  // Timing Modal & Settings
+  const [isTimingModalOpen, setIsTimingModalOpen] = useState(false);
+  const [timingSettings, setTimingSettings] = usePersistentState<TimingSettings>('timingSettings', {
+    mode: 'fixed-note',
+    inhaleSec: 4,
+    totalHumSec: 10,
+    noteSec: 2.5,
+    restSec: 4,
+  });
+
   const selectedPreset = presets.find((p) => p.id === selectedPresetId) || presets[0] || DEFAULT_SEQUENCE_PRESETS[0];
+
+  const handleSelectBreathMode = (mode: BreathMode) => {
+    setSelectedBreathMode(mode);
+    setTimingSettings((prev) => ({
+      ...prev,
+      inhaleSec: mode.inhaleSec,
+      totalHumSec: mode.humSec,
+      restSec: mode.restSec,
+    }));
+  };
 
   // Active Playback State
   const [sessionState, setSessionState] = useState<SessionState>('idle');
@@ -110,6 +131,19 @@ export function App() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Calculate dynamic timing parameters
+  const sequenceNoteCount = selectedPreset.degrees.length;
+
+  const actualNoteDurationSec =
+    timingSettings.mode === 'fixed-note'
+      ? timingSettings.noteSec
+      : timingSettings.totalHumSec / Math.max(1, sequenceNoteCount);
+
+  const actualTotalHumSec =
+    timingSettings.mode === 'fixed-note'
+      ? timingSettings.noteSec * sequenceNoteCount
+      : timingSettings.totalHumSec;
+
   // Main Pacer Loop execution
   const runPacerCycle = useCallback(() => {
     if (!isSessionActive) return;
@@ -119,9 +153,9 @@ export function App() {
     setActiveNote(null);
     setActiveDegree(null);
 
-    const inhaleDuration = selectedBreathMode.inhaleSec;
-    const humDuration = selectedBreathMode.humSec;
-    const restDuration = selectedBreathMode.restSec;
+    const inhaleDuration = timingSettings.inhaleSec;
+    const humDuration = actualTotalHumSec;
+    const restDuration = timingSettings.restSec;
 
     setCurrentPhaseDuration(inhaleDuration);
 
@@ -138,7 +172,7 @@ export function App() {
 
       const degrees = selectedPreset.degrees;
       const offsets = degrees.map(degreeToSemitones);
-      const stepTimeSec = humDuration / Math.max(1, degrees.length);
+      const stepTimeSec = actualNoteDurationSec;
       setPitchDurationSec(stepTimeSec);
 
       let currentStep = 0;
@@ -188,7 +222,7 @@ export function App() {
 
       timerRef.current = restTimeout;
     };
-  }, [isSessionActive, selectedBreathMode, selectedPreset, rootNote, playGuideNote]);
+  }, [isSessionActive, timingSettings, actualTotalHumSec, actualNoteDurationSec, selectedPreset, rootNote, playGuideNote]);
 
   useEffect(() => {
     if (isSessionActive) {
@@ -275,7 +309,7 @@ export function App() {
         {/* Sequence & Breath Mode Presets */}
         <SequenceSelector
           selectedBreathMode={selectedBreathMode.id}
-          onSelectBreathMode={setSelectedBreathMode}
+          onSelectBreathMode={handleSelectBreathMode}
           presets={presets}
           selectedId={selectedPreset.id}
           onSelect={(id) => setSelectedPresetId(id)}
@@ -283,6 +317,7 @@ export function App() {
           onEditPreset={handleEditPreset}
           onDeletePreset={handleDeletePreset}
           onResetDefaults={handleResetDefaults}
+          onOpenTimingModal={() => setIsTimingModalOpen(true)}
         />
 
         {/* Audio Mix Controls */}
@@ -295,6 +330,15 @@ export function App() {
           setDroneFifthVol={setDroneFifthVol}
           guideVol={guideVol}
           setGuideVol={setGuideVol}
+        />
+
+        {/* Custom Pacing & Timing Modal Drawer */}
+        <TimingSettingsModal
+          isOpen={isTimingModalOpen}
+          onClose={() => setIsTimingModalOpen(false)}
+          settings={timingSettings}
+          onUpdate={setTimingSettings}
+          sequenceNoteCount={sequenceNoteCount}
         />
       </main>
 

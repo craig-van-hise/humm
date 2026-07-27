@@ -50,6 +50,7 @@ export const BreathRing: React.FC<BreathRingProps> = ({
           {/* Phase Progress Ring (Inhale / Rest) */}
           {!isHumming && (
             <motion.circle
+              key={`phase-${activePhase}`}
               cx="128"
               cy="128"
               r={RADIUS}
@@ -63,9 +64,8 @@ export const BreathRing: React.FC<BreathRingProps> = ({
               initial={{ strokeDashoffset: CIRCUMFERENCE }}
               animate={{ strokeDashoffset: isActive ? 0 : CIRCUMFERENCE }}
               transition={{
-                key: `phase-${activePhase}`,
-                duration: isActive ? phaseDuration : 0.4,
-                ease: "linear",
+                duration: isActive ? Math.max(0.1, phaseDuration) : 0.3,
+                ease: 'linear',
               }}
             />
           )}
