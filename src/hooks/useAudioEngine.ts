@@ -132,15 +132,11 @@ export function useAudioEngine({
   }, [isSessionActive, startDrone, stopAllAudio]);
 
   // 4. Play Single Guide Pitch (Unison with target note)
-  const playGuidePitch = useCallback(async (pitch: number | string, durationSec: number = 1) => {
-    if (!isEngineInit.current) {
-      await initEngine();
-    }
-    await unlockAudioContext();
+  const playGuidePitch = useCallback((pitch: number | string, durationSec: number = 1) => {
     if (guideSynthRef.current && isEngineInit.current && guideVol > 0) {
-      guideSynthRef.current.triggerAttackRelease(pitch, durationSec);
+      guideSynthRef.current.triggerAttackRelease(pitch, durationSec, Tone.now());
     }
-  }, [initEngine, guideVol]);
+  }, [guideVol]);
 
   // 5. Dynamic Pitch Updates while Drone is running
   useEffect(() => {

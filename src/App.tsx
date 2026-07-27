@@ -7,7 +7,6 @@ import {
 import { PacingModeSelector, PacingPresetId } from './components/PacingModeSelector';
 import { BreathRing } from './components/BreathRing';
 import { PianoKeyboard } from './components/PianoKeyboard';
-import { PitchPicker } from './components/PitchPicker';
 import { AudioControls } from './components/AudioControls';
 import { TimingSettingsModal, TimingSettings } from './components/TimingSettingsModal';
 import { useAudioEngine } from './hooks/useAudioEngine';
@@ -201,12 +200,6 @@ export function App() {
         <PianoKeyboard
           rootNote={rootNote}
           activeNote={session.activeNoteName}
-          onSelectRoot={setRootNote}
-        />
-
-        {/* Fundamental Pitch Selector */}
-        <PitchPicker
-          rootNote={rootNote}
           onSelectRoot={setRootNote}
         />
 

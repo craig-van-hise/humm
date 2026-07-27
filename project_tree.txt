@@ -1,0 +1,57 @@
+
+/Users/vv2024/Documents/Repos - vv2024/Humm
+├── # Foundational Docs
+|  ├── # Technical Specification Sheet- Humm (Mobile Web App).md
+|  ├── ## Project- Humm — Mobile Web App.md
+|  └── Therapeutic Humming Science Research.pdf
+├── # PRPs
+|  ├── # 0.md
+|  ├── # 1.md
+|  ├── # 2.md
+|  ├── # 3.md
+|  ├── # 4.md
+|  ├── # 5.md
+|  ├── # 6.md
+|  └── # 7.md
+├── PROJECT_STATE.md
+├── README.md
+├── index.html
+├── llms.txt
+├── package-lock.json
+├── package.json
+├── postcss.config.js
+├── project_tree.txt
+├── public
+|  └── manifest.webmanifest
+├── src
+|  ├── App.tsx
+|  ├── components
+|  |  ├── AudioControls.tsx
+|  |  ├── BreathRing.tsx
+|  |  ├── PacingModeSelector.tsx
+|  |  ├── PianoKeyboard.tsx
+|  |  ├── PitchPicker.tsx
+|  |  ├── SequenceSelector.tsx
+|  |  └── TimingSettingsModal.tsx
+|  ├── hooks
+|  |  ├── useAudioEngine.ts
+|  |  ├── usePersistentState.ts
+|  |  ├── useSessionEngine.ts
+|  |  └── useWakeLock.ts
+|  ├── index.css
+|  ├── main.tsx
+|  ├── types
+|  |  └── index.ts
+|  └── utils
+|     ├── audioContext.ts
+|     └── pitchMath.ts
+├── tailwind.config.js
+├── tsconfig.json
+└── vite.config.ts
+
+directory: 524 file: 4095
+
+ignored: directory (40)
+
+
+[2K[1G
