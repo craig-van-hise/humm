@@ -60,22 +60,33 @@ export function offsetNote(rootNote: string, semitones: number): string {
  */
 export function degreeToSemitones(degreeStr: string): number {
   const cleaned = degreeStr.trim().toLowerCase();
-  switch (cleaned) {
-    case '1': return 0;
-    case 'b2': case 'b-2': case 'flat2': return 1;
-    case '2': return 2;
-    case '#2': case 'b3': case 'flat3': return 3;
-    case '3': return 4;
-    case '4': return 5;
-    case '#4': case 'b5': case 'flat5': return 6;
-    case '5': return 7;
-    case '#5': case 'b6': case 'flat6': return 8;
-    case '6': return 9;
-    case 'b7': case 'flat7': return 10;
-    case '7': return 11;
-    case '8': case '15': return 12;
-    default:
-      const parsed = parseInt(cleaned, 10);
-      return isNaN(parsed) ? 0 : Math.max(0, Math.min(12, parsed - 1));
+  const isSubTonic = cleaned.endsWith('v') || cleaned.startsWith('v');
+  const core = cleaned.replace(/v/g, '');
+
+  let semitones = 0;
+  switch (core) {
+    case '1': semitones = 0; break;
+    case 'b2': case 'b-2': case 'flat2': semitones = 1; break;
+    case '2': semitones = 2; break;
+    case '#2': case 'b3': case 'flat3': semitones = 3; break;
+    case '3': semitones = 4; break;
+    case '4': semitones = 5; break;
+    case '#4': case 'b5': case 'flat5': semitones = 6; break;
+    case '5': semitones = 7; break;
+    case '#5': case 'b6': case 'flat6': semitones = 8; break;
+    case '6': semitones = 9; break;
+    case 'b7': case 'flat7': semitones = 10; break;
+    case '7': semitones = 11; break;
+    case '8': case '15': semitones = 12; break;
+    default: {
+      const parsed = parseInt(core, 10);
+      semitones = isNaN(parsed) ? 0 : Math.max(0, Math.min(12, parsed - 1));
+      break;
+    }
   }
+
+  if (isSubTonic && semitones > 0) {
+    return semitones - 12;
+  }
+  return semitones;
 }

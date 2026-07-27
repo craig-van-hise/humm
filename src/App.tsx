@@ -1,40 +1,37 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { SessionState, BreathMode, SequencePool } from './types';
-import { DEFAULT_BREATH_MODES, DEFAULT_SEQUENCE_POOLS, SequenceSelector } from './components/SequenceSelector';
+import { SessionState, BreathMode } from './types';
+import {
+  DEFAULT_BREATH_MODES,
+  DEFAULT_SEQUENCE_PRESETS,
+  SequenceSelector,
+  SequencePreset,
+} from './components/SequenceSelector';
 import { BreathRing } from './components/BreathRing';
 import { PianoKeyboard } from './components/PianoKeyboard';
 import { PitchPicker } from './components/PitchPicker';
 import { AudioControls } from './components/AudioControls';
 import { useAudioEngine } from './hooks/useAudioEngine';
+import { usePersistentState } from './hooks/usePersistentState';
 import { useWakeLock } from './hooks/useWakeLock';
-import { offsetNote } from './utils/pitchMath';
+import { offsetNote, degreeToSemitones } from './utils/pitchMath';
 import { Sparkles, Clock } from 'lucide-react';
 
 export function App() {
-  // Calibration & Pitch State
-  const [rootNote, setRootNote] = useState<string>('C3');
+  // Persistent Calibration & Settings
+  const [rootNote, setRootNote] = usePersistentState<string>('rootNote', 'C3');
+  const [droneOctaveOffset, setDroneOctaveOffset] = usePersistentState<number>('droneOctaveOffset', -1);
 
   // Audio State (0 to 1 scales)
-  const [droneRootVol, setDroneRootVol] = useState<number>(0.35);
-  const [droneFifthVol, setDroneFifthVol] = useState<number>(0.25);
-  const [guideVol, setGuideVol] = useState<number>(0.65);
+  const [droneRootVol, setDroneRootVol] = usePersistentState<number>('droneRootVol', 0.6);
+  const [droneFifthVol, setDroneFifthVol] = usePersistentState<number>('droneFifthVol', 0.35);
+  const [guideVol, setGuideVol] = usePersistentState<number>('guideVol', 0.9);
 
   // Breath & Sequence Config
   const [selectedBreathMode, setSelectedBreathMode] = useState<BreathMode>(DEFAULT_BREATH_MODES[0]);
-  const [presets, setPresets] = useState<SequencePool[]>(() => {
-    const saved = localStorage.getItem('humm_custom_presets');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        return [...DEFAULT_SEQUENCE_POOLS, ...parsed];
-      } catch (err) {
-        console.warn('Failed to parse saved presets:', err);
-      }
-    }
-    return DEFAULT_SEQUENCE_POOLS;
-  });
+  const [presets, setPresets] = usePersistentState<SequencePreset[]>('presets', DEFAULT_SEQUENCE_PRESETS);
+  const [selectedPresetId, setSelectedPresetId] = usePersistentState<string>('selectedPresetId', DEFAULT_SEQUENCE_PRESETS[0].id);
 
-  const [selectedPool, setSelectedPool] = useState<SequencePool>(DEFAULT_SEQUENCE_POOLS[0]);
+  const selectedPreset = presets.find((p) => p.id === selectedPresetId) || presets[0] || DEFAULT_SEQUENCE_PRESETS[0];
 
   // Active Playback State
   const [sessionState, setSessionState] = useState<SessionState>('idle');
@@ -42,18 +39,22 @@ export function App() {
   const [activeNote, setActiveNote] = useState<string | null>(null);
   const [activeDegree, setActiveDegree] = useState<string | null>(null);
 
+  // Smooth pitch timing for BreathRing
+  const [pitchDurationSec, setPitchDurationSec] = useState<number>(2.0);
+  const [pitchStepIndex, setPitchStepIndex] = useState<number>(0);
+  const [currentPhaseDuration, setCurrentPhaseDuration] = useState<number>(4.0);
+
   // Session Timers
   const [sessionElapsedSec, setSessionElapsedSec] = useState<number>(0);
-  const [phaseRemainingSec, setPhaseRemainingSec] = useState<number>(0);
-  const [phaseProgressPercent, setPhaseProgressPercent] = useState<number>(0);
 
   // Audio Engine Hook
   const { playGuideNote, initEngine } = useAudioEngine({
     rootNote,
-    isSessionActive,
+    droneOctaveOffset,
     droneRootVol,
     droneFifthVol,
     guideVol,
+    isSessionActive,
   });
 
   // Screen Wake Lock
@@ -64,24 +65,28 @@ export function App() {
   const stepTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Custom Presets Management
-  const handleAddPreset = (newPreset: SequencePool) => {
+  const handleAddPreset = (newPreset: SequencePreset) => {
     const updated = [...presets, newPreset];
     setPresets(updated);
-    setSelectedPool(newPreset);
+    setSelectedPresetId(newPreset.id);
+  };
 
-    const customOnly = updated.filter((p) => p.isCustom);
-    localStorage.setItem('humm_custom_presets', JSON.stringify(customOnly));
+  const handleEditPreset = (updatedPreset: SequencePreset) => {
+    const updated = presets.map((p) => (p.id === updatedPreset.id ? updatedPreset : p));
+    setPresets(updated);
   };
 
   const handleDeletePreset = (id: string) => {
     const updated = presets.filter((p) => p.id !== id);
     setPresets(updated);
-    if (selectedPool.id === id) {
-      setSelectedPool(updated[0] || DEFAULT_SEQUENCE_POOLS[0]);
+    if (selectedPresetId === id) {
+      setSelectedPresetId(updated[0]?.id || DEFAULT_SEQUENCE_PRESETS[0].id);
     }
+  };
 
-    const customOnly = updated.filter((p) => p.isCustom);
-    localStorage.setItem('humm_custom_presets', JSON.stringify(customOnly));
+  const handleResetDefaults = () => {
+    setPresets(DEFAULT_SEQUENCE_PRESETS);
+    setSelectedPresetId(DEFAULT_SEQUENCE_PRESETS[0].id);
   };
 
   // Stopwatch timer
@@ -118,42 +123,33 @@ export function App() {
     const humDuration = selectedBreathMode.humSec;
     const restDuration = selectedBreathMode.restSec;
 
-    let elapsed = 0;
-    setPhaseRemainingSec(inhaleDuration);
-    setPhaseProgressPercent(0);
+    setCurrentPhaseDuration(inhaleDuration);
 
-    const inhaleInterval = setInterval(() => {
-      elapsed += 1;
-      setPhaseRemainingSec(Math.max(0, inhaleDuration - elapsed));
-      setPhaseProgressPercent((elapsed / inhaleDuration) * 100);
+    const inhaleTimeout = setTimeout(() => {
+      startHumPhase();
+    }, inhaleDuration * 1000);
 
-      if (elapsed >= inhaleDuration) {
-        clearInterval(inhaleInterval);
-        startHumPhase();
-      }
-    }, 1000);
-
-    timerRef.current = inhaleInterval;
+    timerRef.current = inhaleTimeout;
 
     // 2. HUMMING PHASE
     const startHumPhase = () => {
       setSessionState('humming');
-      let humElapsed = 0;
-      setPhaseRemainingSec(humDuration);
-      setPhaseProgressPercent(0);
+      setCurrentPhaseDuration(humDuration);
 
-      const notes = selectedPool.intervalOffsets;
-      const degrees = selectedPool.intervalDegrees;
-      const stepTimeSec = humDuration / notes.length;
+      const degrees = selectedPreset.degrees;
+      const offsets = degrees.map(degreeToSemitones);
+      const stepTimeSec = humDuration / Math.max(1, degrees.length);
+      setPitchDurationSec(stepTimeSec);
 
       let currentStep = 0;
 
       const triggerStepNote = (stepIdx: number) => {
-        if (stepIdx < notes.length) {
-          const semitones = notes[stepIdx];
+        if (stepIdx < degrees.length) {
+          const semitones = offsets[stepIdx];
           const noteName = offsetNote(rootNote, semitones);
           setActiveNote(noteName);
           setActiveDegree(degrees[stepIdx]);
+          setPitchStepIndex(stepIdx);
           playGuideNote(noteName, stepTimeSec);
         }
       };
@@ -162,26 +158,21 @@ export function App() {
 
       const sequenceInterval = setInterval(() => {
         currentStep += 1;
-        if (currentStep < notes.length) {
+        if (currentStep < degrees.length) {
           triggerStepNote(currentStep);
+        } else {
+          clearInterval(sequenceInterval);
         }
       }, stepTimeSec * 1000);
 
       stepTimerRef.current = sequenceInterval;
 
-      const humTimer = setInterval(() => {
-        humElapsed += 1;
-        setPhaseRemainingSec(Math.max(0, humDuration - humElapsed));
-        setPhaseProgressPercent((humElapsed / humDuration) * 100);
+      const humTimeout = setTimeout(() => {
+        if (stepTimerRef.current) clearInterval(stepTimerRef.current);
+        startRestPhase();
+      }, humDuration * 1000);
 
-        if (humElapsed >= humDuration) {
-          clearInterval(humTimer);
-          if (stepTimerRef.current) clearInterval(stepTimerRef.current);
-          startRestPhase();
-        }
-      }, 1000);
-
-      timerRef.current = humTimer;
+      timerRef.current = humTimeout;
     };
 
     // 3. RESTING PHASE
@@ -189,25 +180,15 @@ export function App() {
       setSessionState('resting');
       setActiveNote(null);
       setActiveDegree(null);
+      setCurrentPhaseDuration(restDuration);
 
-      let restElapsed = 0;
-      setPhaseRemainingSec(restDuration);
-      setPhaseProgressPercent(0);
+      const restTimeout = setTimeout(() => {
+        runPacerCycle();
+      }, restDuration * 1000);
 
-      const restTimer = setInterval(() => {
-        restElapsed += 1;
-        setPhaseRemainingSec(Math.max(0, restDuration - restElapsed));
-        setPhaseProgressPercent((restElapsed / restDuration) * 100);
-
-        if (restElapsed >= restDuration) {
-          clearInterval(restTimer);
-          runPacerCycle();
-        }
-      }, 1000);
-
-      timerRef.current = restTimer;
+      timerRef.current = restTimeout;
     };
-  }, [isSessionActive, selectedBreathMode, selectedPool, rootNote, playGuideNote]);
+  }, [isSessionActive, selectedBreathMode, selectedPreset, rootNote, playGuideNote]);
 
   useEffect(() => {
     if (isSessionActive) {
@@ -216,12 +197,12 @@ export function App() {
       setSessionState('idle');
       setActiveNote(null);
       setActiveDegree(null);
-      if (timerRef.current) clearInterval(timerRef.current);
+      if (timerRef.current) clearTimeout(timerRef.current);
       if (stepTimerRef.current) clearInterval(stepTimerRef.current);
     }
 
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+      if (timerRef.current) clearTimeout(timerRef.current);
       if (stepTimerRef.current) clearInterval(stepTimerRef.current);
     };
   }, [isSessionActive, runPacerCycle]);
@@ -267,14 +248,15 @@ export function App() {
       <main className="flex-1 max-w-lg w-full mx-auto px-4 pb-8 pt-2 space-y-4">
         {/* Interactive Breath Ring Circle */}
         <BreathRing
-          isSessionActive={isSessionActive}
+          isActive={isSessionActive}
           onToggleSession={handleToggleSession}
-          sessionState={sessionState}
-          activeNote={activeNote}
-          activeDegree={activeDegree}
           rootNote={rootNote}
-          progressPercent={phaseProgressPercent}
-          phaseRemainingSec={phaseRemainingSec}
+          activePhase={isSessionActive ? sessionState : 'ready'}
+          phaseDuration={currentPhaseDuration}
+          activeNoteName={activeNote}
+          activeDegree={activeDegree}
+          pitchDurationSec={pitchDurationSec}
+          pitchStepIndex={pitchStepIndex}
         />
 
         {/* 14-White / 10-Black Seam-Centered Piano Keyboard */}
@@ -290,19 +272,23 @@ export function App() {
           onSelectRoot={setRootNote}
         />
 
-        {/* Sequence & Breath Mode Presets (Horizontal Carousel) */}
+        {/* Sequence & Breath Mode Presets */}
         <SequenceSelector
           selectedBreathMode={selectedBreathMode.id}
           onSelectBreathMode={setSelectedBreathMode}
           presets={presets}
-          selectedPoolId={selectedPool.id}
-          onSelectSequencePool={setSelectedPool}
+          selectedId={selectedPreset.id}
+          onSelect={(id) => setSelectedPresetId(id)}
           onAddPreset={handleAddPreset}
+          onEditPreset={handleEditPreset}
           onDeletePreset={handleDeletePreset}
+          onResetDefaults={handleResetDefaults}
         />
 
         {/* Audio Mix Controls */}
         <AudioControls
+          droneOctaveOffset={droneOctaveOffset}
+          setDroneOctaveOffset={setDroneOctaveOffset}
           droneRootVol={droneRootVol}
           setDroneRootVol={setDroneRootVol}
           droneFifthVol={droneFifthVol}

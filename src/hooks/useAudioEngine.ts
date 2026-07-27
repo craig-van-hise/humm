@@ -1,178 +1,162 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useRef, useEffect, useCallback } from 'react';
 import * as Tone from 'tone';
-import { midiToFreq, noteToMidi } from '../utils/pitchMath';
 import { unlockAudioContext } from '../utils/audioContext';
 
-interface UseAudioEngineOptions {
-  rootNote: string;
-  isSessionActive: boolean;
-  droneRootVol: number;  // 0 to 1
-  droneFifthVol: number; // 0 to 1
-  guideVol: number;      // 0 to 1
-}
-
-function volToDb(vol: number): number {
-  if (vol <= 0.001) return -Infinity;
-  return 20 * Math.log10(vol);
+interface AudioEngineProps {
+  rootNote: string;                // e.g., "C3"
+  droneOctaveOffset?: number;      // e.g., -1 (-1 Octave default), -2, or 0
+  droneRootVol: number;            // 0.0 to 1.0
+  droneFifthVol: number;           // 0.0 to 1.0
+  guideVol: number;                // 0.0 to 1.0
+  isSessionActive?: boolean;
 }
 
 export function useAudioEngine({
   rootNote,
-  isSessionActive,
+  droneOctaveOffset = -1,
   droneRootVol,
   droneFifthVol,
   guideVol,
-}: UseAudioEngineOptions) {
-  const isInitialized = useRef<boolean>(false);
-  const droneFilterRef = useRef<Tone.Filter | null>(null);
-  
-  const droneRootGainRef = useRef<Tone.Volume | null>(null);
-  const droneFifthGainRef = useRef<Tone.Volume | null>(null);
-  const droneOscRootRef = useRef<Tone.Oscillator | null>(null);
-  const droneOscFifthRef = useRef<Tone.Oscillator | null>(null);
-
-  const guideGainRef = useRef<Tone.Volume | null>(null);
+  isSessionActive = false,
+}: AudioEngineProps) {
+  // Audio Nodes
+  const isEngineInit = useRef(false);
   const guideSynthRef = useRef<Tone.Synth | null>(null);
+  
+  const droneRootOscRef = useRef<Tone.OmniOscillator<any> | null>(null);
+  const droneFifthOscRef = useRef<Tone.OmniOscillator<any> | null>(null);
+  
+  const droneRootFilterRef = useRef<Tone.Filter | null>(null);
+  const droneFifthFilterRef = useRef<Tone.Filter | null>(null);
 
-  // Initialize synth chain
+  const droneRootGainRef = useRef<Tone.Gain | null>(null);
+  const droneFifthGainRef = useRef<Tone.Gain | null>(null);
+  const guideGainRef = useRef<Tone.Gain | null>(null);
+
+  // 1. Initialize Audio Engine Architecture
   const initEngine = useCallback(async () => {
-    if (isInitialized.current) return;
+    if (isEngineInit.current) return;
 
     await unlockAudioContext();
+    await Tone.start();
 
-    // Lowpass filter <380Hz
-    const filter = new Tone.Filter({
-      frequency: 380,
-      type: 'lowpass',
-      rolloff: -24,
-    });
+    // Gain Nodes (Linear Volume 0.0 to 1.0)
+    droneRootGainRef.current = new Tone.Gain(droneRootVol).toDestination();
+    droneFifthGainRef.current = new Tone.Gain(droneFifthVol).toDestination();
+    guideGainRef.current = new Tone.Gain(guideVol).toDestination();
 
-    const rootFreq = midiToFreq(noteToMidi(rootNote));
-    const fifthFreq = midiToFreq(noteToMidi(rootNote) + 7);
+    // Low-Pass Filters for Warmth (400 - 600 Hz cutoff)
+    droneRootFilterRef.current = new Tone.Filter(500, "lowpass").connect(droneRootGainRef.current);
+    droneFifthFilterRef.current = new Tone.Filter(600, "lowpass").connect(droneFifthGainRef.current);
 
-    // Root drone volume node & oscillator
-    const droneRootVolNode = new Tone.Volume(volToDb(droneRootVol));
-    const oscRoot = new Tone.Oscillator({
-      frequency: rootFreq,
-      type: 'triangle',
-    });
+    // Drone Oscillators
+    // Root: Filtered Sawtooth (Warm Humming Pad)
+    droneRootOscRef.current = new Tone.OmniOscillator({
+      type: "sawtooth",
+    }).connect(droneRootFilterRef.current);
 
-    // 5th drone volume node & oscillator
-    const droneFifthVolNode = new Tone.Volume(volToDb(droneFifthVol));
-    const oscFifth = new Tone.Oscillator({
-      frequency: fifthFreq,
-      type: 'sine',
-    });
+    // 5th: Soft Triangle (Subtle Layered Harmonic)
+    droneFifthOscRef.current = new Tone.OmniOscillator({
+      type: "triangle",
+    }).connect(droneFifthFilterRef.current);
 
-    oscRoot.connect(droneRootVolNode);
-    droneRootVolNode.connect(filter);
-
-    oscFifth.connect(droneFifthVolNode);
-    droneFifthVolNode.connect(filter);
-
-    filter.toDestination();
-
-    droneFilterRef.current = filter;
-    droneRootGainRef.current = droneRootVolNode;
-    droneFifthGainRef.current = droneFifthVolNode;
-    droneOscRootRef.current = oscRoot;
-    droneOscFifthRef.current = oscFifth;
-
-    // Guide Tone Lead Synth
-    const guideVolNode = new Tone.Volume(volToDb(guideVol));
-    const guideSynth = new Tone.Synth({
-      oscillator: { type: 'sine' },
+    // Guide Tone Synth: Soft Triangle with gentle ADSR envelope
+    guideSynthRef.current = new Tone.Synth({
+      oscillator: { type: "triangle" },
       envelope: {
         attack: 0.08,
         decay: 0.1,
         sustain: 0.85,
         release: 0.15,
       },
-    });
+    }).connect(guideGainRef.current);
 
-    guideSynth.connect(guideVolNode);
-    guideVolNode.toDestination();
+    isEngineInit.current = true;
+  }, [droneRootVol, droneFifthVol, guideVol]);
 
-    guideGainRef.current = guideVolNode;
-    guideSynthRef.current = guideSynth;
+  // 2. Start Drone Playback
+  const startDrone = useCallback(async () => {
+    await initEngine();
 
-    isInitialized.current = true;
-  }, [rootNote, droneRootVol, droneFifthVol, guideVol]);
+    const rootMidi = Tone.Frequency(rootNote).toMidi();
+    
+    // Calculate Drone Pitches based on droneOctaveOffset (-1 default)
+    const droneRootMidi = rootMidi + (droneOctaveOffset * 12);
+    const droneFifthMidi = droneRootMidi + 7; // 5th tracks drone octave
 
-  // Start / Stop drone oscillators based on session activity
+    const rootFreq = Tone.Frequency(droneRootMidi, "midi").toFrequency();
+    const fifthFreq = Tone.Frequency(droneFifthMidi, "midi").toFrequency();
+
+    if (droneRootOscRef.current && droneFifthOscRef.current) {
+      droneRootOscRef.current.frequency.setValueAtTime(rootFreq, Tone.now());
+      droneFifthOscRef.current.frequency.setValueAtTime(fifthFreq, Tone.now());
+
+      if (droneRootOscRef.current.state !== 'started') {
+        droneRootOscRef.current.start();
+      }
+      if (droneFifthOscRef.current.state !== 'started') {
+        droneFifthOscRef.current.start();
+      }
+    }
+  }, [initEngine, rootNote, droneOctaveOffset]);
+
+  // 3. Stop Drone Playback
+  const stopDrone = useCallback(() => {
+    if (droneRootOscRef.current && droneFifthOscRef.current) {
+      droneRootOscRef.current.stop();
+      droneFifthOscRef.current.stop();
+    }
+  }, []);
+
+  // Sync session state with drone oscillator lifecycle
   useEffect(() => {
-    if (!isInitialized.current) return;
-
     if (isSessionActive) {
-      if (droneOscRootRef.current?.state !== 'started') {
-        droneOscRootRef.current?.start();
-      }
-      if (droneOscFifthRef.current?.state !== 'started') {
-        droneOscFifthRef.current?.start();
-      }
+      startDrone();
     } else {
-      droneOscRootRef.current?.stop();
-      droneOscFifthRef.current?.stop();
+      stopDrone();
     }
-  }, [isSessionActive]);
+  }, [isSessionActive, startDrone, stopDrone]);
 
-  // Update drone frequencies when rootNote changes
+  // 4. Play Single Guide Pitch (Unison with target note)
+  const playGuidePitch = useCallback(async (pitch: number | string, durationSec: number = 1) => {
+    if (!isEngineInit.current) {
+      await initEngine();
+    }
+    await unlockAudioContext();
+    if (guideSynthRef.current && isEngineInit.current && guideVol > 0) {
+      guideSynthRef.current.triggerAttackRelease(pitch, durationSec);
+    }
+  }, [initEngine, guideVol]);
+
+  // 5. Dynamic Pitch Updates while Drone is running
   useEffect(() => {
-    if (!isInitialized.current) return;
-    const rootFreq = midiToFreq(noteToMidi(rootNote));
-    const fifthFreq = midiToFreq(noteToMidi(rootNote) + 7);
+    if (isEngineInit.current && droneRootOscRef.current && droneFifthOscRef.current) {
+      const rootMidi = Tone.Frequency(rootNote).toMidi();
+      const droneRootMidi = rootMidi + (droneOctaveOffset * 12);
+      const droneFifthMidi = droneRootMidi + 7;
 
-    if (droneOscRootRef.current) {
-      droneOscRootRef.current.frequency.rampTo(rootFreq, 0.1);
+      droneRootOscRef.current.frequency.rampTo(Tone.Frequency(droneRootMidi, "midi").toFrequency(), 0.1);
+      droneFifthOscRef.current.frequency.rampTo(Tone.Frequency(droneFifthMidi, "midi").toFrequency(), 0.1);
     }
-    if (droneOscFifthRef.current) {
-      droneOscFifthRef.current.frequency.rampTo(fifthFreq, 0.1);
-    }
-  }, [rootNote]);
+  }, [rootNote, droneOctaveOffset]);
 
-  // Dynamic Volume Controls
+  // 6. Dynamic Volume Adjustments
   useEffect(() => {
-    if (droneRootGainRef.current) {
-      droneRootGainRef.current.volume.value = volToDb(droneRootVol);
-    }
-  }, [droneRootVol]);
+    if (droneRootGainRef.current) droneRootGainRef.current.gain.rampTo(droneRootVol, 0.05);
+    if (droneFifthGainRef.current) droneFifthGainRef.current.gain.rampTo(droneFifthVol, 0.05);
+    if (guideGainRef.current) guideGainRef.current.gain.rampTo(guideVol, 0.05);
+  }, [droneRootVol, droneFifthVol, guideVol]);
 
-  useEffect(() => {
-    if (droneFifthGainRef.current) {
-      droneFifthGainRef.current.volume.value = volToDb(droneFifthVol);
-    }
-  }, [droneFifthVol]);
-
-  useEffect(() => {
-    if (guideGainRef.current) {
-      guideGainRef.current.volume.value = volToDb(guideVol);
-    }
-  }, [guideVol]);
-
-  // Trigger guide note
-  const playGuideNote = useCallback(
-    async (noteName: string, durationSec: number = 1) => {
-      if (!isInitialized.current) {
-        await initEngine();
-      }
-      await unlockAudioContext();
-
-      if (guideSynthRef.current && guideVol > 0) {
-        guideSynthRef.current.triggerAttackRelease(noteName, durationSec);
-      }
-    },
-    [initEngine, guideVol]
-  );
-
-  // Cleanup on unmount
+  // 7. Cleanup on unmount
   useEffect(() => {
     return () => {
       try {
-        droneOscRootRef.current?.stop();
-        droneOscFifthRef.current?.stop();
-        droneOscRootRef.current?.dispose();
-        droneOscFifthRef.current?.dispose();
-        droneFilterRef.current?.dispose();
+        droneRootOscRef.current?.stop();
+        droneFifthOscRef.current?.stop();
+        droneRootOscRef.current?.dispose();
+        droneFifthOscRef.current?.dispose();
+        droneRootFilterRef.current?.dispose();
+        droneFifthFilterRef.current?.dispose();
         droneRootGainRef.current?.dispose();
         droneFifthGainRef.current?.dispose();
         guideSynthRef.current?.dispose();
@@ -184,7 +168,10 @@ export function useAudioEngine({
   }, []);
 
   return {
+    startDrone,
+    stopDrone,
+    playGuidePitch,
+    playGuideNote: playGuidePitch,
     initEngine,
-    playGuideNote,
   };
 }

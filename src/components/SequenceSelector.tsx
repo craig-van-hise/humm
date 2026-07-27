@@ -1,7 +1,12 @@
 import React, { useState } from 'react';
-import { BreathModeId, BreathMode, SequencePool } from '../types';
-import { Activity, Plus, Trash2, Music } from 'lucide-react';
-import { degreeToSemitones } from '../utils/pitchMath';
+import { Plus, Edit3, Trash2, RotateCcw, Activity, Music } from 'lucide-react';
+import { BreathModeId, BreathMode } from '../types';
+
+export interface SequencePreset {
+  id: string;
+  name: string;
+  degrees: string[];
+}
 
 export const DEFAULT_BREATH_MODES: BreathMode[] = [
   {
@@ -30,95 +35,113 @@ export const DEFAULT_BREATH_MODES: BreathMode[] = [
   },
 ];
 
-export const DEFAULT_SEQUENCE_POOLS: SequencePool[] = [
+export const DEFAULT_SEQUENCE_PRESETS: SequencePreset[] = [
   {
     id: 'micro_tuning',
     name: 'Gentle Micro-Tuning',
-    description: 'Minimal tension micro-interval warmups.',
-    intervalOffsets: [0, 1, 0, 3, 0],
-    intervalDegrees: ['1', 'b2', '1', 'b3', '1'],
+    degrees: ['1', 'b2', '1', 'b3', '1'],
+  },
+  {
+    id: 'sub_tonic_dip',
+    name: 'Sub-Tonic Dip',
+    degrees: ['1', '7v', '1'],
   },
   {
     id: 'resonance_anchor',
     name: 'Resonance Anchor',
-    description: 'Fifth interval harmonic stabilization.',
-    intervalOffsets: [0, 7, 0],
-    intervalDegrees: ['1', '5', '1'],
+    degrees: ['1', '5', '1'],
   },
   {
     id: 'triadic',
     name: 'Triadic Foundation',
-    description: 'Step-wise resonance across register.',
-    intervalOffsets: [0, 4, 7, 4, 0],
-    intervalDegrees: ['1', '3', '5', '3', '1'],
+    degrees: ['1', '3', '5', '3', '1'],
   },
   {
     id: 'five_note',
     name: 'Five-Note Slide',
-    description: 'Linear vocal connection & pitch continuity.',
-    intervalOffsets: [0, 2, 4, 5, 7, 5, 4, 2, 0],
-    intervalDegrees: ['1', '2', '3', '4', '5', '4', '3', '2', '1'],
+    degrees: ['1', '2', '3', '4', '5', '4', '3', '2', '1'],
   },
 ];
 
-interface SequenceSelectorProps {
+export interface SequenceSelectorProps {
   selectedBreathMode: BreathModeId;
   onSelectBreathMode: (mode: BreathMode) => void;
-  presets: SequencePool[];
-  selectedPoolId: string;
-  onSelectSequencePool: (pool: SequencePool) => void;
-  onAddPreset: (newPreset: SequencePool) => void;
+  presets: SequencePreset[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+  onAddPreset: (newPreset: SequencePreset) => void;
+  onEditPreset: (updatedPreset: SequencePreset) => void;
   onDeletePreset: (id: string) => void;
+  onResetDefaults: () => void;
 }
 
 export const SequenceSelector: React.FC<SequenceSelectorProps> = ({
   selectedBreathMode,
   onSelectBreathMode,
   presets,
-  selectedPoolId,
-  onSelectSequencePool,
+  selectedId,
+  onSelect,
   onAddPreset,
+  onEditPreset,
   onDeletePreset,
+  onResetDefaults,
 }) => {
-  const [isAdding, setIsAdding] = useState<boolean>(false);
-  const [newPresetName, setNewPresetName] = useState<string>('');
-  const [newDegreesInput, setNewDegreesInput] = useState<string>('1, b2, 1, b3, 1');
+  const [mode, setMode] = useState<'idle' | 'add' | 'edit'>('idle');
+  const [formName, setFormName] = useState('');
+  const [formDegrees, setFormDegrees] = useState('');
 
-  const handleCreate = () => {
-    if (!newPresetName.trim()) return;
-    const rawDegrees = newDegreesInput.split(',').map((s) => s.trim()).filter(Boolean);
-    if (rawDegrees.length === 0) return;
+  const activePreset = presets.find((p) => p.id === selectedId);
 
-    const intervalOffsets = rawDegrees.map(degreeToSemitones);
+  const handleOpenAdd = () => {
+    setFormName('');
+    setFormDegrees('1, 7v, 1');
+    setMode('add');
+  };
 
-    onAddPreset({
-      id: `custom-${Date.now()}`,
-      name: newPresetName.trim(),
-      intervalDegrees: rawDegrees,
-      intervalOffsets,
-      isCustom: true,
-    });
+  const handleOpenEdit = () => {
+    if (!activePreset) return;
+    setFormName(activePreset.name);
+    setFormDegrees(activePreset.degrees.join(', '));
+    setMode('edit');
+  };
 
-    setNewPresetName('');
-    setIsAdding(false);
+  const handleSave = () => {
+    if (!formName.trim()) return;
+    const degrees = formDegrees.split(',').map((s) => s.trim()).filter(Boolean);
+
+    if (mode === 'add') {
+      onAddPreset({
+        id: `preset-${Date.now()}`,
+        name: formName,
+        degrees,
+      });
+    } else if (mode === 'edit' && activePreset) {
+      onEditPreset({
+        ...activePreset,
+        name: formName,
+        degrees,
+      });
+    }
+
+    setMode('idle');
   };
 
   return (
     <div className="w-full max-w-lg mx-auto my-3 space-y-4">
-      {/* Breath Pacing Presets */}
+      {/* Breath Pacing Protocols */}
       <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2.5 flex items-center gap-1.5">
           <Activity className="w-4 h-4 text-cyan-400" />
           Breath Pacing Protocol
         </h3>
         <div className="grid grid-cols-3 gap-2">
-          {DEFAULT_BREATH_MODES.map((mode) => {
-            const isSelected = selectedBreathMode === mode.id;
+          {DEFAULT_BREATH_MODES.map((bMode) => {
+            const isSelected = selectedBreathMode === bMode.id;
 
             return (
               <button
-                key={mode.id}
-                onClick={() => onSelectBreathMode(mode)}
+                key={bMode.id}
+                onClick={() => onSelectBreathMode(bMode)}
                 className={`p-2.5 rounded-xl text-left transition-all duration-200 border flex flex-col justify-between cursor-pointer ${
                   isSelected
                     ? 'bg-slate-800 border-cyan-400 text-white shadow-[0_0_12px_rgba(6,182,212,0.3)]'
@@ -126,9 +149,9 @@ export const SequenceSelector: React.FC<SequenceSelectorProps> = ({
                 }`}
               >
                 <div>
-                  <span className="text-xs font-bold block">{mode.name}</span>
+                  <span className="text-xs font-bold block">{bMode.name}</span>
                   <span className="text-[10px] text-slate-400 mt-1 block">
-                    {mode.inhaleSec}s / {mode.humSec}s / {mode.restSec}s
+                    {bMode.inhaleSec}s / {bMode.humSec}s / {bMode.restSec}s
                   </span>
                 </div>
               </button>
@@ -137,93 +160,120 @@ export const SequenceSelector: React.FC<SequenceSelectorProps> = ({
         </div>
       </div>
 
-      {/* Melodic Sequence Horizontal Carousel */}
+      {/* Melodic Sequence Carousel */}
       <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-3">
         <div className="flex justify-between items-center">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
             <Music className="w-4 h-4 text-emerald-400" />
             Melodic Sequence Presets
           </h3>
-          <button
-            onClick={() => setIsAdding(!isAdding)}
-            className="flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 font-medium cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add Preset
-          </button>
+          
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onResetDefaults}
+              className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
+              title="Reset default presets"
+            >
+              <RotateCcw className="w-3 h-3" />
+              Reset
+            </button>
+
+            <button
+              onClick={handleOpenEdit}
+              className="flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 font-medium cursor-pointer"
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              Edit
+            </button>
+
+            <button
+              onClick={handleOpenAdd}
+              className="flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 font-medium cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add
+            </button>
+          </div>
         </div>
 
-        {/* Add Custom Preset Form Drawer */}
-        {isAdding && (
-          <div className="bg-slate-950 border border-slate-800 p-3 rounded-xl space-y-2.5 my-2">
+        {/* Inline Form Drawer for Add & Edit */}
+        {mode !== 'idle' && (
+          <div className="bg-slate-950 border border-slate-800 p-3 rounded-xl space-y-2 my-2">
+            <div className="text-xs font-semibold text-slate-300">
+              {mode === 'add' ? 'Create New Preset' : `Editing: ${activePreset?.name}`}
+            </div>
+
             <input
               type="text"
-              placeholder="Preset Name (e.g., Minor Pentatonic)"
-              value={newPresetName}
-              onChange={(e) => setNewPresetName(e.target.value)}
+              placeholder="Preset Name (e.g. Sub-Tonic Dip)"
+              value={formName}
+              onChange={(e) => setFormName(e.target.value)}
               className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
             />
+
             <input
               type="text"
-              placeholder="Degrees separated by comma (e.g., 1, b3, 4, 5, b7)"
-              value={newDegreesInput}
-              onChange={(e) => setNewDegreesInput(e.target.value)}
+              placeholder="Comma-separated degrees (e.g. 1, 7v, 1, 3, 5)"
+              value={formDegrees}
+              onChange={(e) => setFormDegrees(e.target.value)}
               className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
             />
+
+            <span className="text-[10px] text-slate-500 block">
+              Tip: Use <code className="text-cyan-400">7v</code> or <code className="text-cyan-400">b7v</code> for pitches below the tonic.
+            </span>
+
             <div className="flex justify-end gap-2 pt-1">
               <button
-                onClick={() => setIsAdding(false)}
-                className="text-xs text-slate-400 hover:text-white px-2.5 py-1"
+                onClick={() => setMode('idle')}
+                className="text-xs text-slate-400 hover:text-white px-2 py-1"
               >
                 Cancel
               </button>
               <button
-                onClick={handleCreate}
+                onClick={handleSave}
                 className="text-xs bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-3 py-1 rounded-lg transition-colors cursor-pointer"
               >
-                Save Preset
+                Save Changes
               </button>
             </div>
           </div>
         )}
 
-        {/* Horizontal Scroll Carousel */}
+        {/* Horizontal Carousel */}
         <div className="flex gap-3 overflow-x-auto pb-2 pt-1 snap-x scrollbar-thin scrollbar-thumb-slate-700">
           {presets.map((preset) => {
-            const isSelected = preset.id === selectedPoolId;
+            const isSelected = preset.id === selectedId;
 
             return (
               <div
                 key={preset.id}
-                onClick={() => onSelectSequencePool(preset)}
-                className={`snap-start shrink-0 min-w-[170px] max-w-[210px] p-3 rounded-xl border transition-all cursor-pointer relative group flex flex-col justify-between ${
+                onClick={() => onSelect(preset.id)}
+                className={`snap-start shrink-0 min-w-[160px] max-w-[200px] p-3 rounded-xl border transition-all cursor-pointer relative group flex flex-col justify-between ${
                   isSelected
-                    ? 'bg-slate-800 border-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.3)]'
-                    : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                    ? "bg-slate-800 border-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.2)]"
+                    : "bg-slate-950/60 border-slate-800 hover:border-slate-700"
                 }`}
               >
-                {/* Header & Delete Option */}
                 <div className="flex justify-between items-start mb-2">
                   <span className="text-xs font-semibold text-white truncate pr-2">
                     {preset.name}
                   </span>
-                  {preset.isCustom && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeletePreset(preset.id);
-                      }}
-                      className="text-slate-500 hover:text-rose-400 transition-colors p-0.5"
-                      aria-label="Delete preset"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeletePreset(preset.id);
+                    }}
+                    className="text-slate-500 hover:text-red-400 transition-colors p-0.5 cursor-pointer"
+                    aria-label="Delete preset"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
 
-                {/* Degrees Pills */}
                 <div className="flex flex-wrap gap-1">
-                  {preset.intervalDegrees.map((deg, idx) => (
+                  {preset.degrees.map((deg, idx) => (
                     <span
                       key={idx}
                       className="text-[10px] bg-slate-950 text-cyan-400 border border-slate-800 rounded px-1.5 py-0.5 font-mono"
