@@ -15,9 +15,10 @@ export interface BreathMode {
 export interface SequencePool {
   id: string;
   name: string;
-  description: string;
+  description?: string;
   intervalOffsets: number[]; // Relative semitone offsets from root
   intervalDegrees: string[]; // Degree labels e.g. ["1", "b2", "1", "b3", "1"]
+  isCustom?: boolean;
 }
 
 export interface PianoKey {
@@ -31,8 +32,9 @@ export interface PianoKey {
 export interface AppState {
   rootNote: string;           // Fundamental pitch e.g. "C3"
   octave: number;             // Octave transposition e.g. 3
-  droneVolume: number;        // -60 to 0 dB
-  guideVolume: number;        // -60 to 0 dB
+  droneRootVolume: number;    // 0 to 1 scale
+  droneFifthVolume: number;   // 0 to 1 scale
+  guideVolume: number;        // 0 to 1 scale
   isDroneMuted: boolean;
   isGuideMuted: boolean;
   tempoBpm: number;            // 45 to 60 BPM

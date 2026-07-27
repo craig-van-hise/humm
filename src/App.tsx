@@ -1,29 +1,40 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { SessionState, BreathMode, SequencePool } from './types';
-import { BREATH_MODES, SEQUENCE_POOLS } from './components/SequenceSelector';
+import { DEFAULT_BREATH_MODES, DEFAULT_SEQUENCE_POOLS, SequenceSelector } from './components/SequenceSelector';
 import { BreathRing } from './components/BreathRing';
 import { PianoKeyboard } from './components/PianoKeyboard';
 import { PitchPicker } from './components/PitchPicker';
-import { SequenceSelector } from './components/SequenceSelector';
 import { AudioControls } from './components/AudioControls';
 import { useAudioEngine } from './hooks/useAudioEngine';
 import { useWakeLock } from './hooks/useWakeLock';
 import { offsetNote } from './utils/pitchMath';
-import { Sparkles, Clock, SlidersHorizontal, ShieldCheck } from 'lucide-react';
+import { Sparkles, Clock } from 'lucide-react';
 
 export function App() {
   // Calibration & Pitch State
   const [rootNote, setRootNote] = useState<string>('C3');
 
-  // Audio State
-  const [droneVolume, setDroneVolume] = useState<number>(-12);
-  const [guideVolume, setGuideVolume] = useState<number>(-6);
-  const [isDroneMuted, setIsDroneMuted] = useState<boolean>(false);
-  const [isGuideMuted, setIsGuideMuted] = useState<boolean>(false);
+  // Audio State (0 to 1 scales)
+  const [droneRootVol, setDroneRootVol] = useState<number>(0.35);
+  const [droneFifthVol, setDroneFifthVol] = useState<number>(0.25);
+  const [guideVol, setGuideVol] = useState<number>(0.65);
 
   // Breath & Sequence Config
-  const [selectedBreathMode, setSelectedBreathMode] = useState<BreathMode>(BREATH_MODES[0]);
-  const [selectedPool, setSelectedPool] = useState<SequencePool>(SEQUENCE_POOLS[0]);
+  const [selectedBreathMode, setSelectedBreathMode] = useState<BreathMode>(DEFAULT_BREATH_MODES[0]);
+  const [presets, setPresets] = useState<SequencePool[]>(() => {
+    const saved = localStorage.getItem('humm_custom_presets');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return [...DEFAULT_SEQUENCE_POOLS, ...parsed];
+      } catch (err) {
+        console.warn('Failed to parse saved presets:', err);
+      }
+    }
+    return DEFAULT_SEQUENCE_POOLS;
+  });
+
+  const [selectedPool, setSelectedPool] = useState<SequencePool>(DEFAULT_SEQUENCE_POOLS[0]);
 
   // Active Playback State
   const [sessionState, setSessionState] = useState<SessionState>('idle');
@@ -39,10 +50,10 @@ export function App() {
   // Audio Engine Hook
   const { playGuideNote, initEngine } = useAudioEngine({
     rootNote,
-    droneVolume,
-    guideVolume,
-    isDroneMuted,
-    isGuideMuted,
+    isSessionActive,
+    droneRootVol,
+    droneFifthVol,
+    guideVol,
   });
 
   // Screen Wake Lock
@@ -52,7 +63,28 @@ export function App() {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const stepTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Total session stopwatch timer
+  // Custom Presets Management
+  const handleAddPreset = (newPreset: SequencePool) => {
+    const updated = [...presets, newPreset];
+    setPresets(updated);
+    setSelectedPool(newPreset);
+
+    const customOnly = updated.filter((p) => p.isCustom);
+    localStorage.setItem('humm_custom_presets', JSON.stringify(customOnly));
+  };
+
+  const handleDeletePreset = (id: string) => {
+    const updated = presets.filter((p) => p.id !== id);
+    setPresets(updated);
+    if (selectedPool.id === id) {
+      setSelectedPool(updated[0] || DEFAULT_SEQUENCE_POOLS[0]);
+    }
+
+    const customOnly = updated.filter((p) => p.isCustom);
+    localStorage.setItem('humm_custom_presets', JSON.stringify(customOnly));
+  };
+
+  // Stopwatch timer
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
     if (isSessionActive) {
@@ -67,7 +99,6 @@ export function App() {
     };
   }, [isSessionActive]);
 
-  // Format stopwatch mm:ss
   const formatTime = (totalSec: number) => {
     const mins = Math.floor(totalSec / 60);
     const secs = totalSec % 60;
@@ -111,7 +142,6 @@ export function App() {
       setPhaseRemainingSec(humDuration);
       setPhaseProgressPercent(0);
 
-      // Play Melodic Sequence Steps during Hum duration
       const notes = selectedPool.intervalOffsets;
       const degrees = selectedPool.intervalDegrees;
       const stepTimeSec = humDuration / notes.length;
@@ -171,7 +201,6 @@ export function App() {
 
         if (restElapsed >= restDuration) {
           clearInterval(restTimer);
-          // Loop back to next Inhale cycle
           runPacerCycle();
         }
       }, 1000);
@@ -180,7 +209,6 @@ export function App() {
     };
   }, [isSessionActive, selectedBreathMode, selectedPool, rootNote, playGuideNote]);
 
-  // Trigger pacer when session toggles active
   useEffect(() => {
     if (isSessionActive) {
       runPacerCycle();
@@ -198,12 +226,7 @@ export function App() {
     };
   }, [isSessionActive, runPacerCycle]);
 
-  // Handle single note tap on visual keyboard
-  const handleKeyTouch = (noteName: string) => {
-    playGuideNote(noteName, 1.2);
-  };
-
-  // Toggle Session state
+  // Toggle Session state (triggered when tapping BreathRing)
   const handleToggleSession = async () => {
     if (!isSessionActive) {
       await initEngine();
@@ -215,7 +238,7 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-[#0A0E17] text-slate-100 flex flex-col justify-between selection:bg-cyan-500 selection:text-white">
-      {/* Top Header Navigation Bar */}
+      {/* Header */}
       <header className="sticky top-0 z-30 bg-[#0A0E17]/80 backdrop-blur-xl border-b border-slate-800/80 px-4 py-3">
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -232,7 +255,7 @@ export function App() {
             </div>
           </div>
 
-          {/* Session Timer Badge */}
+          {/* Stopwatch */}
           <div className="flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-full border border-slate-800 text-xs font-mono text-slate-300">
             <Clock className="w-3.5 h-3.5 text-cyan-400" />
             <span>{formatTime(sessionElapsedSec)}</span>
@@ -242,8 +265,10 @@ export function App() {
 
       {/* Main Viewport Content */}
       <main className="flex-1 max-w-lg w-full mx-auto px-4 pb-8 pt-2 space-y-4">
-        {/* Animated Breath Ring Visualizer */}
+        {/* Interactive Breath Ring Circle */}
         <BreathRing
+          isSessionActive={isSessionActive}
+          onToggleSession={handleToggleSession}
           sessionState={sessionState}
           activeNote={activeNote}
           activeDegree={activeDegree}
@@ -252,11 +277,11 @@ export function App() {
           phaseRemainingSec={phaseRemainingSec}
         />
 
-        {/* 17-Key Touch Piano Keyboard */}
+        {/* 14-White / 10-Black Seam-Centered Piano Keyboard */}
         <PianoKeyboard
           rootNote={rootNote}
           activeNote={activeNote}
-          onKeyTouch={handleKeyTouch}
+          onSelectRoot={setRootNote}
         />
 
         {/* Fundamental Pitch Selector */}
@@ -265,30 +290,29 @@ export function App() {
           onSelectRoot={setRootNote}
         />
 
-        {/* Sequence & Breath Mode Presets */}
+        {/* Sequence & Breath Mode Presets (Horizontal Carousel) */}
         <SequenceSelector
           selectedBreathMode={selectedBreathMode.id}
           onSelectBreathMode={setSelectedBreathMode}
+          presets={presets}
           selectedPoolId={selectedPool.id}
           onSelectSequencePool={setSelectedPool}
+          onAddPreset={handleAddPreset}
+          onDeletePreset={handleDeletePreset}
         />
 
-        {/* Play/Pause & Audio Controls */}
+        {/* Audio Mix Controls */}
         <AudioControls
-          isSessionActive={isSessionActive}
-          onToggleSession={handleToggleSession}
-          droneVolume={droneVolume}
-          onDroneVolumeChange={setDroneVolume}
-          guideVolume={guideVolume}
-          onGuideVolumeChange={setGuideVolume}
-          isDroneMuted={isDroneMuted}
-          onToggleDroneMute={() => setIsDroneMuted(!isDroneMuted)}
-          isGuideMuted={isGuideMuted}
-          onToggleGuideMute={() => setIsGuideMuted(!isGuideMuted)}
+          droneRootVol={droneRootVol}
+          setDroneRootVol={setDroneRootVol}
+          droneFifthVol={droneFifthVol}
+          setDroneFifthVol={setDroneFifthVol}
+          guideVol={guideVol}
+          setGuideVol={setGuideVol}
         />
       </main>
 
-      {/* Mobile Footer */}
+      {/* Footer */}
       <footer className="border-t border-slate-900 bg-[#0A0E17] py-3 text-center text-[11px] text-slate-500">
         Humm Mobile Web App &bull; Paranasal Sinus NO & Vagal Activation Tool
       </footer>

@@ -56,37 +56,26 @@ export function offsetNote(rootNote: string, semitones: number): string {
 }
 
 /**
- * Generates a 17-key keyboard layout centered around root or standard range C2 to E4 (MIDI 36 to 64)
+ * Converts a degree label (e.g., "1", "b2", "3", "5") to semitone offset from root
  */
-export function generatePianoKeys(rootNote: string): PianoKey[] {
-  const rootMidi = noteToMidi(rootNote);
-  // Keyboard range: starting 7 semitones below root up to 10 semitones above root (17 keys total)
-  const startMidi = Math.max(36, rootMidi - 7); // Minimum C2
-  const totalKeys = 17;
-  const keys: PianoKey[] = [];
-
-  for (let i = 0; i < totalKeys; i++) {
-    const midi = startMidi + i;
-    const note = midiToNoteName(midi);
-    const noteIndex = ((midi % 12) + 12) % 12;
-    const isBlack = [1, 3, 6, 8, 10].includes(noteIndex);
-    const isRoot = midi === rootMidi;
-
-    let degreeLabel: string | undefined;
-    if (isRoot) degreeLabel = '1';
-    else if (midi === rootMidi + 7) degreeLabel = '5';
-    else if (midi === rootMidi + 4) degreeLabel = '3';
-    else if (midi === rootMidi + 3) degreeLabel = 'b3';
-    else if (midi === rootMidi + 1) degreeLabel = 'b2';
-
-    keys.push({
-      note,
-      midi,
-      isBlack,
-      isRoot,
-      degreeLabel,
-    });
+export function degreeToSemitones(degreeStr: string): number {
+  const cleaned = degreeStr.trim().toLowerCase();
+  switch (cleaned) {
+    case '1': return 0;
+    case 'b2': case 'b-2': case 'flat2': return 1;
+    case '2': return 2;
+    case '#2': case 'b3': case 'flat3': return 3;
+    case '3': return 4;
+    case '4': return 5;
+    case '#4': case 'b5': case 'flat5': return 6;
+    case '5': return 7;
+    case '#5': case 'b6': case 'flat6': return 8;
+    case '6': return 9;
+    case 'b7': case 'flat7': return 10;
+    case '7': return 11;
+    case '8': case '15': return 12;
+    default:
+      const parsed = parseInt(cleaned, 10);
+      return isNaN(parsed) ? 0 : Math.max(0, Math.min(12, parsed - 1));
   }
-
-  return keys;
 }

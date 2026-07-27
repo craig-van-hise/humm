@@ -1,89 +1,97 @@
 import React from 'react';
-import { generatePianoKeys } from '../utils/pitchMath';
 
 interface PianoKeyboardProps {
-  rootNote: string;
   activeNote: string | null;
-  onKeyTouch?: (note: string) => void;
+  rootNote: string;
+  onSelectRoot: (note: string) => void;
 }
 
+// 14 White Keys ($F_2$ to $E_4$)
+const WHITE_KEYS = ["F2", "G2", "A2", "B2", "C3", "D3", "E3", "F3", "G3", "A3", "B3", "C4", "D4", "E4"];
+
+// 10 Black Keys centered mathematically between white key seams
+const BLACK_KEYS = [
+  { note: "F#2", whiteIndex: 0 },
+  { note: "G#2", whiteIndex: 1 },
+  { note: "A#2", whiteIndex: 2 },
+  { note: "C#3", whiteIndex: 4 },
+  { note: "D#3", whiteIndex: 5 },
+  { note: "F#3", whiteIndex: 7 },
+  { note: "G#3", whiteIndex: 8 },
+  { note: "A#3", whiteIndex: 9 },
+  { note: "C#4", whiteIndex: 11 },
+  { note: "D#4", whiteIndex: 12 },
+];
+
 export const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
-  rootNote,
   activeNote,
-  onKeyTouch,
+  rootNote,
+  onSelectRoot,
 }) => {
-  const keys = generatePianoKeys(rootNote);
+  const totalWhite = WHITE_KEYS.length;
 
   return (
-    <div className="w-full max-w-lg mx-auto my-4 px-2">
-      <div className="flex items-center justify-between text-xs text-slate-400 mb-2 px-1">
-        <span className="flex items-center gap-1.5 font-medium">
-          <span className="w-2 h-2 rounded-full bg-cyan-400 inline-block shadow-[0_0_8px_rgba(6,182,212,0.8)]" />
-          Root ({rootNote})
-        </span>
-        <span className="text-slate-400">17-Key Touch Keyboard</span>
-      </div>
+    <div className="w-full max-w-lg mx-auto my-3">
+      {/* Piano Container */}
+      <div className="relative w-full h-36 bg-slate-900 rounded-2xl p-2 border border-slate-800 shadow-inner select-none overflow-hidden">
+        {/* 1. White Keys Layer */}
+        <div className="flex w-full h-full gap-[2px]">
+          {WHITE_KEYS.map((note) => {
+            const isRoot = note === rootNote;
+            const isActive = note === activeNote;
 
-      {/* Piano Keys Container */}
-      <div className="relative flex justify-center h-36 bg-slate-950 p-2 rounded-2xl border border-slate-800 shadow-2xl overflow-hidden select-none">
-        {keys.map((key) => {
-          const isActive = activeNote === key.note;
-
-          if (key.isBlack) {
             return (
               <button
-                key={key.note}
+                key={note}
                 onTouchStart={(e) => {
                   e.preventDefault();
-                  onKeyTouch?.(key.note);
+                  onSelectRoot(note);
                 }}
-                onClick={() => onKeyTouch?.(key.note)}
-                className={`absolute z-10 w-6 sm:w-7 h-20 rounded-b-md transition-all duration-150 transform -translate-x-1/2 ${
+                onClick={() => onSelectRoot(note)}
+                className={`flex-1 rounded-b-md flex flex-col justify-end pb-2 items-center transition-colors relative cursor-pointer ${
                   isActive
-                    ? 'bg-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.9)] border-emerald-300'
-                    : 'bg-slate-900 hover:bg-slate-800 border-t border-slate-700 shadow-lg'
+                    ? "bg-cyan-300 text-slate-950 font-bold border-2 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.8)]"
+                    : isRoot
+                    ? "bg-sky-100 text-slate-900 font-bold border-2 border-cyan-500"
+                    : "bg-white text-slate-800 hover:bg-slate-100"
                 }`}
-                style={{
-                  left: `calc(${(keys.filter(k => !k.isBlack && k.midi < key.midi).length / keys.filter(k => !k.isBlack).length) * 100}% + 12px)`,
-                }}
               >
-                <div className="flex flex-col items-center justify-end h-full pb-1 text-[9px] font-bold text-slate-400">
-                  {key.isRoot && (
-                    <span className="w-1.5 h-1.5 mb-1 rounded-full bg-cyan-400" />
-                  )}
-                  <span>{key.note}</span>
-                </div>
+                {isRoot && <span className="w-2 h-2 rounded-full bg-cyan-500 mb-1" />}
+                <span className="text-[11px] font-semibold">{note}</span>
               </button>
             );
-          }
+          })}
+        </div>
+
+        {/* 2. Black Keys Overlay */}
+        {BLACK_KEYS.map(({ note, whiteIndex }) => {
+          const isRoot = note === rootNote;
+          const isActive = note === activeNote;
+          const leftPercent = ((whiteIndex + 1) / totalWhite) * 100;
 
           return (
             <button
-              key={key.note}
+              key={note}
               onTouchStart={(e) => {
                 e.preventDefault();
-                onKeyTouch?.(key.note);
+                onSelectRoot(note);
               }}
-              onClick={() => onKeyTouch?.(key.note)}
-              className={`flex-1 h-full mx-[1px] rounded-b-lg flex flex-col justify-end items-center pb-2 transition-all duration-150 border-t ${
+              onClick={() => onSelectRoot(note)}
+              style={{
+                left: `${leftPercent}%`,
+                transform: "translateX(-50%)",
+                width: `${(1 / totalWhite) * 65}%`,
+              }}
+              className={`absolute top-2 h-20 rounded-b-md z-10 flex flex-col justify-end pb-2 items-center transition-colors cursor-pointer ${
                 isActive
-                  ? 'bg-gradient-to-b from-emerald-400 to-cyan-500 text-slate-950 font-extrabold shadow-[0_0_20px_rgba(16,185,129,0.8)] border-emerald-300'
-                  : key.isRoot
-                  ? 'bg-slate-800 border-cyan-500/60 text-cyan-300 hover:bg-slate-700'
-                  : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'
+                  ? "bg-cyan-400 text-slate-950 font-bold shadow-[0_0_15px_rgba(6,182,212,0.9)]"
+                  : isRoot
+                  ? "bg-cyan-600 text-white font-bold"
+                  : "bg-slate-950 text-slate-300 hover:bg-slate-800 border border-slate-800"
               }`}
             >
-              {key.isRoot && (
-                <span className="w-2 h-2 mb-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_rgba(6,182,212,0.8)]" />
-              )}
-              {key.degreeLabel && !key.isRoot && (
-                <span className="text-[10px] font-semibold text-emerald-400 mb-0.5">
-                  [{key.degreeLabel}]
-                </span>
-              )}
-              <span className="text-[10px] font-medium tracking-tighter">
-                {key.note}
-              </span>
+              {isRoot && <span className="w-1.5 h-1.5 rounded-full bg-cyan-300 mb-1" />}
+              <span className="text-[9px] font-medium">{note}</span>
             </button>
           );
         })}
