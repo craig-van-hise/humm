@@ -90,3 +90,20 @@ export function degreeToSemitones(degreeStr: string): number {
   }
   return semitones;
 }
+
+/**
+ * Converts a degree label to note name relative to rootNote
+ */
+export function degreeToNoteName(rootNote: string, degree: string): string {
+  const semitones = degreeToSemitones(degree);
+  return offsetNote(rootNote, semitones);
+}
+
+/**
+ * Converts a degree label to frequency in Hz relative to rootNote
+ */
+export function degreeToFrequency(rootNote: string, degree: string): number {
+  const noteName = degreeToNoteName(rootNote, degree);
+  return midiToFreq(noteToMidi(noteName));
+}
+

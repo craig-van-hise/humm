@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { SessionState } from './types';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   DEFAULT_SEQUENCE_PRESETS,
   SequenceSelector,
@@ -12,9 +11,9 @@ import { PitchPicker } from './components/PitchPicker';
 import { AudioControls } from './components/AudioControls';
 import { TimingSettingsModal, TimingSettings } from './components/TimingSettingsModal';
 import { useAudioEngine } from './hooks/useAudioEngine';
+import { useSessionEngine } from './hooks/useSessionEngine';
 import { usePersistentState } from './hooks/usePersistentState';
 import { useWakeLock } from './hooks/useWakeLock';
-import { offsetNote, degreeToSemitones } from './utils/pitchMath';
 import { Sparkles, Clock } from 'lucide-react';
 
 export function App() {
@@ -47,19 +46,34 @@ export function App() {
 
   const selectedPreset = presets.find((p) => p.id === selectedPresetId) || presets[0] || DEFAULT_SEQUENCE_PRESETS[0];
 
-  // Active Playback State
-  const [sessionState, setSessionState] = useState<SessionState>('idle');
-  const [isSessionActive, setIsSessionActive] = useState<boolean>(false);
-  const [activeNote, setActiveNote] = useState<string | null>(null);
-  const [activeDegree, setActiveDegree] = useState<string | null>(null);
-
-  // Smooth pitch timing for BreathRing
-  const [pitchDurationSec, setPitchDurationSec] = useState<number>(2.0);
-  const [pitchStepIndex, setPitchStepIndex] = useState<number>(0);
-  const [currentPhaseDuration, setCurrentPhaseDuration] = useState<number>(4.0);
-
   // Session Timers
   const [sessionElapsedSec, setSessionElapsedSec] = useState<number>(0);
+
+  // Derive active timing based on selected pacing mode
+  const sequenceNoteCount = selectedPreset.degrees.length;
+
+  const getActiveTimings = useCallback(() => {
+    switch (selectedPacingMode) {
+      case 'vagal-calm':
+        return { inhaleSec: 4, restSec: 4, noteDurationSec: 2.0 };
+      case 'focus-theta':
+        return { inhaleSec: 3, restSec: 2, noteDurationSec: 1.2 };
+      case 'sinus-recharge':
+        return { inhaleSec: 4, restSec: 180, noteDurationSec: 2.0 };
+      case 'custom':
+        const noteDurationSec =
+          timingSettings.mode === 'fixed-note'
+            ? timingSettings.noteSec
+            : timingSettings.totalHumSec / Math.max(1, sequenceNoteCount);
+        return {
+          inhaleSec: timingSettings.inhaleSec,
+          restSec: timingSettings.restSec,
+          noteDurationSec,
+        };
+    }
+  }, [selectedPacingMode, timingSettings, sequenceNoteCount]);
+
+  const activeTimings = getActiveTimings();
 
   // Audio Engine Hook
   const { playGuideNote, initEngine, startDrone, stopAllAudio } = useAudioEngine({
@@ -68,15 +82,21 @@ export function App() {
     droneRootVol,
     droneFifthVol,
     guideVol,
-    isSessionActive,
+  });
+
+  // Session State Engine Hook
+  const session = useSessionEngine({
+    rootNote,
+    degrees: selectedPreset.degrees,
+    inhaleSec: activeTimings.inhaleSec,
+    restSec: activeTimings.restSec,
+    noteDurationSec: activeTimings.noteDurationSec,
+    onPlayPitch: playGuideNote,
+    onStopAudio: stopAllAudio,
   });
 
   // Screen Wake Lock
-  useWakeLock(isSessionActive);
-
-  // References for active cycle interval timers
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const stepTimerRef = useRef<NodeJS.Timeout | null>(null);
+  useWakeLock(session.activePhase !== 'ready');
 
   // Custom Presets Management
   const handleAddPreset = (newPreset: SequencePreset) => {
@@ -106,7 +126,7 @@ export function App() {
   // Stopwatch timer
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
-    if (isSessionActive) {
+    if (session.activePhase !== 'ready') {
       interval = setInterval(() => {
         setSessionElapsedSec((prev) => prev + 1);
       }, 1000);
@@ -116,7 +136,7 @@ export function App() {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isSessionActive]);
+  }, [session.activePhase]);
 
   const formatTime = (totalSec: number) => {
     const mins = Math.floor(totalSec / 60);
@@ -124,143 +144,14 @@ export function App() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Derive active timing based on selected pacing mode
-  const sequenceNoteCount = selectedPreset.degrees.length;
-
-  const getActiveTimings = useCallback(() => {
-    switch (selectedPacingMode) {
-      case 'vagal-calm':
-        return { inhaleSec: 4, humSec: 10, restSec: 4, noteDurationSec: 2.0 };
-      case 'focus-theta':
-        return { inhaleSec: 3, humSec: 6, restSec: 2, noteDurationSec: 1.2 };
-      case 'sinus-recharge':
-        return { inhaleSec: 4, humSec: 10, restSec: 180, noteDurationSec: 2.0 };
-      case 'custom':
-        const humSec =
-          timingSettings.mode === 'fixed-note'
-            ? timingSettings.noteSec * sequenceNoteCount
-            : timingSettings.totalHumSec;
-        const noteDurationSec =
-          timingSettings.mode === 'fixed-note'
-            ? timingSettings.noteSec
-            : timingSettings.totalHumSec / Math.max(1, sequenceNoteCount);
-        return {
-          inhaleSec: timingSettings.inhaleSec,
-          humSec,
-          restSec: timingSettings.restSec,
-          noteDurationSec,
-        };
-    }
-  }, [selectedPacingMode, timingSettings, sequenceNoteCount]);
-
-  const activeTimings = getActiveTimings();
-
-  // Main Pacer Loop execution
-  const runPacerCycle = useCallback(() => {
-    if (!isSessionActive) return;
-
-    // 1. INHALE PHASE
-    setSessionState('inhale');
-    setActiveNote(null);
-    setActiveDegree(null);
-
-    const inhaleDuration = activeTimings.inhaleSec;
-    const humDuration = activeTimings.humSec;
-    const restDuration = activeTimings.restSec;
-
-    setCurrentPhaseDuration(inhaleDuration);
-
-    const inhaleTimeout = setTimeout(() => {
-      startHumPhase();
-    }, inhaleDuration * 1000);
-
-    timerRef.current = inhaleTimeout;
-
-    // 2. HUMMING PHASE
-    const startHumPhase = () => {
-      setSessionState('humming');
-      setCurrentPhaseDuration(humDuration);
-
-      const degrees = selectedPreset.degrees;
-      const offsets = degrees.map(degreeToSemitones);
-      const stepTimeSec = activeTimings.noteDurationSec;
-      setPitchDurationSec(stepTimeSec);
-
-      let currentStep = 0;
-
-      const triggerStepNote = (stepIdx: number) => {
-        if (stepIdx < degrees.length) {
-          const semitones = offsets[stepIdx];
-          const noteName = offsetNote(rootNote, semitones);
-          setActiveNote(noteName);
-          setActiveDegree(degrees[stepIdx]);
-          setPitchStepIndex(stepIdx);
-          playGuideNote(noteName, stepTimeSec);
-        }
-      };
-
-      triggerStepNote(0);
-
-      const sequenceInterval = setInterval(() => {
-        currentStep += 1;
-        if (currentStep < degrees.length) {
-          triggerStepNote(currentStep);
-        } else {
-          clearInterval(sequenceInterval);
-        }
-      }, stepTimeSec * 1000);
-
-      stepTimerRef.current = sequenceInterval;
-
-      const humTimeout = setTimeout(() => {
-        if (stepTimerRef.current) clearInterval(stepTimerRef.current);
-        startRestPhase();
-      }, humDuration * 1000);
-
-      timerRef.current = humTimeout;
-    };
-
-    // 3. RESTING PHASE
-    const startRestPhase = () => {
-      setSessionState('resting');
-      setActiveNote(null);
-      setActiveDegree(null);
-      setCurrentPhaseDuration(restDuration);
-
-      const restTimeout = setTimeout(() => {
-        runPacerCycle();
-      }, restDuration * 1000);
-
-      timerRef.current = restTimeout;
-    };
-  }, [isSessionActive, activeTimings, selectedPreset, rootNote, playGuideNote]);
-
-  useEffect(() => {
-    if (isSessionActive) {
-      runPacerCycle();
-    } else {
-      setSessionState('idle');
-      setActiveNote(null);
-      setActiveDegree(null);
-      if (timerRef.current) clearTimeout(timerRef.current);
-      if (stepTimerRef.current) clearInterval(stepTimerRef.current);
-    }
-
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      if (stepTimerRef.current) clearInterval(stepTimerRef.current);
-    };
-  }, [isSessionActive, runPacerCycle]);
-
   // Toggle Session state (triggered when tapping BreathRing)
   const handleToggleSession = async () => {
-    if (!isSessionActive) {
+    if (session.activePhase === 'ready') {
       await initEngine();
       await startDrone();
-      setIsSessionActive(true);
+      session.startSession();
     } else {
-      stopAllAudio();
-      setIsSessionActive(false);
+      session.stopSession();
     }
   };
 
@@ -295,21 +186,21 @@ export function App() {
       <main className="flex-1 max-w-lg w-full mx-auto px-4 pb-8 pt-2 space-y-4">
         {/* Interactive Breath Ring Circle */}
         <BreathRing
-          isActive={isSessionActive}
+          isActive={session.activePhase !== 'ready'}
           onToggleSession={handleToggleSession}
           rootNote={rootNote}
-          activePhase={isSessionActive ? sessionState : 'ready'}
-          phaseDuration={currentPhaseDuration}
-          activeNoteName={activeNote}
-          activeDegree={activeDegree}
-          pitchDurationSec={pitchDurationSec}
-          pitchStepIndex={pitchStepIndex}
+          activePhase={session.activePhase}
+          phaseDuration={session.phaseDurationSec}
+          activeNoteName={session.activeNoteName}
+          activeDegree={session.activeDegree}
+          pitchDurationSec={activeTimings.noteDurationSec}
+          pitchStepIndex={session.pitchStepIndex}
         />
 
         {/* 14-White / 10-Black Seam-Centered Piano Keyboard */}
         <PianoKeyboard
           rootNote={rootNote}
-          activeNote={activeNote}
+          activeNote={session.activeNoteName}
           onSelectRoot={setRootNote}
         />
 
