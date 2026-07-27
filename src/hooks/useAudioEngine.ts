@@ -108,14 +108,28 @@ export function useAudioEngine({
     }
   }, []);
 
+  // INSTANT STOP: Cuts off both Drone & Guide Tone immediately
+  const stopAllAudio = useCallback(() => {
+    // 1. Instantly release guide tone envelope
+    if (guideSynthRef.current) {
+      guideSynthRef.current.triggerRelease(Tone.now());
+    }
+
+    // 2. Stop drone oscillators
+    if (droneRootOscRef.current && droneFifthOscRef.current) {
+      droneRootOscRef.current.stop();
+      droneFifthOscRef.current.stop();
+    }
+  }, []);
+
   // Sync session state with drone oscillator lifecycle
   useEffect(() => {
     if (isSessionActive) {
       startDrone();
     } else {
-      stopDrone();
+      stopAllAudio();
     }
-  }, [isSessionActive, startDrone, stopDrone]);
+  }, [isSessionActive, startDrone, stopAllAudio]);
 
   // 4. Play Single Guide Pitch (Unison with target note)
   const playGuidePitch = useCallback(async (pitch: number | string, durationSec: number = 1) => {
@@ -170,6 +184,7 @@ export function useAudioEngine({
   return {
     startDrone,
     stopDrone,
+    stopAllAudio,
     playGuidePitch,
     playGuideNote: playGuidePitch,
     initEngine,

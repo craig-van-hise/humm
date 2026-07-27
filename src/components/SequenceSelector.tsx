@@ -64,8 +64,6 @@ export const DEFAULT_SEQUENCE_PRESETS: SequencePreset[] = [
 ];
 
 export interface SequenceSelectorProps {
-  selectedBreathMode: BreathModeId;
-  onSelectBreathMode: (mode: BreathMode) => void;
   presets: SequencePreset[];
   selectedId: string;
   onSelect: (id: string) => void;
@@ -73,12 +71,9 @@ export interface SequenceSelectorProps {
   onEditPreset: (updatedPreset: SequencePreset) => void;
   onDeletePreset: (id: string) => void;
   onResetDefaults: () => void;
-  onOpenTimingModal?: () => void;
 }
 
 export const SequenceSelector: React.FC<SequenceSelectorProps> = ({
-  selectedBreathMode,
-  onSelectBreathMode,
   presets,
   selectedId,
   onSelect,
@@ -86,7 +81,6 @@ export const SequenceSelector: React.FC<SequenceSelectorProps> = ({
   onEditPreset,
   onDeletePreset,
   onResetDefaults,
-  onOpenTimingModal,
 }) => {
   const [mode, setMode] = useState<'idle' | 'add' | 'edit'>('idle');
   const [formName, setFormName] = useState('');
@@ -129,50 +123,7 @@ export const SequenceSelector: React.FC<SequenceSelectorProps> = ({
   };
 
   return (
-    <div className="w-full max-w-lg mx-auto my-3 space-y-4">
-      {/* Breath Pacing Protocols */}
-      <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
-        <div className="flex justify-between items-center mb-2.5">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-            <Activity className="w-4 h-4 text-cyan-400" />
-            Breath Pacing Protocol
-          </h3>
-          {onOpenTimingModal && (
-            <button
-              onClick={onOpenTimingModal}
-              className="flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 font-medium cursor-pointer transition-colors"
-            >
-              <Sliders className="w-3.5 h-3.5" />
-              Custom Timing
-            </button>
-          )}
-        </div>
-        <div className="grid grid-cols-3 gap-2">
-          {DEFAULT_BREATH_MODES.map((bMode) => {
-            const isSelected = selectedBreathMode === bMode.id;
-
-            return (
-              <button
-                key={bMode.id}
-                onClick={() => onSelectBreathMode(bMode)}
-                className={`p-2.5 rounded-xl text-left transition-all duration-200 border flex flex-col justify-between cursor-pointer ${
-                  isSelected
-                    ? 'bg-slate-800 border-cyan-400 text-white shadow-[0_0_12px_rgba(6,182,212,0.3)]'
-                    : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:bg-slate-800'
-                }`}
-              >
-                <div>
-                  <span className="text-xs font-bold block">{bMode.name}</span>
-                  <span className="text-[10px] text-slate-400 mt-1 block">
-                    {bMode.inhaleSec}s / {bMode.humSec}s / {bMode.restSec}s
-                  </span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
+    <div className="w-full max-w-lg mx-auto my-3">
       {/* Melodic Sequence Carousel */}
       <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-3">
         <div className="flex justify-between items-center">
