@@ -1,5 +1,5 @@
 import React from 'react';
-import { Volume2, Music } from 'lucide-react';
+import { Volume2, Music, Settings } from 'lucide-react';
 
 interface AudioControlsProps {
   droneOctaveOffset: number;
@@ -10,6 +10,7 @@ interface AudioControlsProps {
   setDroneFifthVol: (vol: number) => void;
   guideVol: number;
   setGuideVol: (vol: number) => void;
+  onOpenToneSettings?: () => void;
 }
 
 export const AudioControls: React.FC<AudioControlsProps> = ({
@@ -21,6 +22,7 @@ export const AudioControls: React.FC<AudioControlsProps> = ({
   setDroneFifthVol,
   guideVol,
   setGuideVol,
+  onOpenToneSettings,
 }) => {
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-4 shadow-xl">
@@ -29,6 +31,16 @@ export const AudioControls: React.FC<AudioControlsProps> = ({
           <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
           Acoustic Tone Mixer
         </h3>
+        {onOpenToneSettings && (
+          <button
+            onClick={onOpenToneSettings}
+            className="p-1 rounded-lg text-slate-400 hover:text-cyan-400 hover:bg-slate-800 transition-colors cursor-pointer flex items-center gap-1 text-[11px] font-medium"
+            title="Configure Acoustic Tone & Filter Parameters"
+            aria-label="Tone Settings"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* Drone Octave Selector */}

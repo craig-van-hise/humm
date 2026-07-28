@@ -9,16 +9,26 @@ import { BreathRing } from './components/BreathRing';
 import { PianoKeyboard } from './components/PianoKeyboard';
 import { AudioControls } from './components/AudioControls';
 import { TimingSettingsModal, TimingSettings } from './components/TimingSettingsModal';
+import { ToneSettingsModal } from './components/ToneSettingsModal';
 import { useAudioEngine } from './hooks/useAudioEngine';
 import { useSessionEngine } from './hooks/useSessionEngine';
 import { usePersistentState } from './hooks/usePersistentState';
 import { useWakeLock } from './hooks/useWakeLock';
 import { Sparkles, Clock } from 'lucide-react';
+import * as Tone from 'tone';
 
 export function App() {
   // Persistent Calibration & Settings
   const [rootNote, setRootNote] = usePersistentState<string>('rootNote', 'C3');
   const [droneOctaveOffset, setDroneOctaveOffset] = usePersistentState<number>('droneOctaveOffset', -1);
+
+  // Acoustic Tone & Filter Settings (PRP #10 & #11)
+  const [droneRootWaveform, setDroneRootWaveform] = usePersistentState<Tone.ToneOscillatorType>('droneRootWaveform', 'sawtooth');
+  const [droneRootFilterFreq, setDroneRootFilterFreq] = usePersistentState<number>('droneRootFilterFreq', 500);
+  const [droneFifthWaveform, setDroneFifthWaveform] = usePersistentState<Tone.ToneOscillatorType>('droneFifthWaveform', 'triangle');
+  const [droneFifthFilterFreq, setDroneFifthFilterFreq] = usePersistentState<number>('droneFifthFilterFreq', 600);
+  const [guideWaveform, setGuideWaveform] = usePersistentState<Tone.ToneOscillatorType>('guideWaveform', 'triangle');
+  const [guideFilterFreq, setGuideFilterFreq] = usePersistentState<number>('guideFilterFreq', 1000);
 
   // Audio State (0 to 1 scales)
   const [droneRootVol, setDroneRootVol] = usePersistentState<number>('droneRootVol', 0.6);
@@ -33,8 +43,9 @@ export function App() {
   const [presets, setPresets] = usePersistentState<SequencePreset[]>('presets', DEFAULT_SEQUENCE_PRESETS);
   const [selectedPresetId, setSelectedPresetId] = usePersistentState<string>('selectedPresetId', DEFAULT_SEQUENCE_PRESETS[0].id);
 
-  // Timing Modal & Custom Settings
+  // Modal States
   const [isTimingModalOpen, setIsTimingModalOpen] = useState(false);
+  const [isToneSettingsModalOpen, setIsToneSettingsModalOpen] = useState(false);
   const [timingSettings, setTimingSettings] = usePersistentState<TimingSettings>('timingSettings', {
     mode: 'fixed-note',
     inhaleSec: 4,
@@ -81,6 +92,12 @@ export function App() {
     droneRootVol,
     droneFifthVol,
     guideVol,
+    droneRootWaveform,
+    droneRootFilterFreq,
+    droneFifthWaveform,
+    droneFifthFilterFreq,
+    guideWaveform,
+    guideFilterFreq,
   });
 
   // Session State Engine Hook
@@ -120,6 +137,15 @@ export function App() {
   const handleResetDefaults = () => {
     setPresets(DEFAULT_SEQUENCE_PRESETS);
     setSelectedPresetId(DEFAULT_SEQUENCE_PRESETS[0].id);
+  };
+
+  const handleResetToneDefaults = () => {
+    setDroneRootWaveform('sawtooth');
+    setDroneRootFilterFreq(500);
+    setDroneFifthWaveform('triangle');
+    setDroneFifthFilterFreq(600);
+    setGuideWaveform('triangle');
+    setGuideFilterFreq(1000);
   };
 
   // Stopwatch timer
@@ -233,6 +259,7 @@ export function App() {
           setDroneFifthVol={setDroneFifthVol}
           guideVol={guideVol}
           setGuideVol={setGuideVol}
+          onOpenToneSettings={() => setIsToneSettingsModalOpen(true)}
         />
 
         {/* Custom Pacing & Timing Modal Drawer */}
@@ -243,6 +270,25 @@ export function App() {
           onUpdate={setTimingSettings}
           sequenceNoteCount={sequenceNoteCount}
         />
+
+        {/* Acoustic Tone & Filter Settings Modal */}
+        <ToneSettingsModal
+          isOpen={isToneSettingsModalOpen}
+          onClose={() => setIsToneSettingsModalOpen(false)}
+          droneRootWaveform={droneRootWaveform}
+          setDroneRootWaveform={setDroneRootWaveform}
+          droneRootFilterFreq={droneRootFilterFreq}
+          setDroneRootFilterFreq={setDroneRootFilterFreq}
+          droneFifthWaveform={droneFifthWaveform}
+          setDroneFifthWaveform={setDroneFifthWaveform}
+          droneFifthFilterFreq={droneFifthFilterFreq}
+          setDroneFifthFilterFreq={setDroneFifthFilterFreq}
+          guideWaveform={guideWaveform}
+          setGuideWaveform={setGuideWaveform}
+          guideFilterFreq={guideFilterFreq}
+          setGuideFilterFreq={setGuideFilterFreq}
+          onResetDefaults={handleResetToneDefaults}
+        />
       </main>
 
       {/* Footer */}
@@ -252,3 +298,4 @@ export function App() {
     </div>
   );
 }
+
