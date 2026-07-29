@@ -5,7 +5,7 @@ export interface BreathRingProps {
   isActive: boolean;
   onToggleSession: () => void;
   rootNote: string;
-  activePhase: 'inhale' | 'humming' | 'resting' | 'ready' | 'idle';
+  activePhase: 'inhale' | 'humming' | 'resting' | 'ready' | 'idle' | 'free';
   phaseDuration: number;
   activeNoteName: string | null;
   activeDegree: string | null;
@@ -28,6 +28,7 @@ export const BreathRing: React.FC<BreathRingProps> = ({
   pitchStepIndex = 0,
 }) => {
   const isHumming = activePhase === 'humming';
+  const isFree = activePhase === 'free';
 
   return (
     <div className="flex flex-col items-center justify-center my-4 select-none">
@@ -47,8 +48,29 @@ export const BreathRing: React.FC<BreathRingProps> = ({
             fill="none"
           />
 
+          {/* Free Mode Ambient Pulse Ring */}
+          {isFree && (
+            <motion.circle
+              cx="128"
+              cy="128"
+              r={RADIUS}
+              className="stroke-emerald-400"
+              strokeWidth="8"
+              fill="none"
+              animate={{
+                opacity: [0.4, 0.9, 0.4],
+                strokeWidth: [6, 10, 6],
+              }}
+              transition={{
+                duration: 4,
+                repeat: Infinity,
+                ease: 'easeInOut',
+              }}
+            />
+          )}
+
           {/* Phase Progress Ring (Inhale / Rest) */}
-          {!isHumming && (
+          {!isHumming && !isFree && (
             <motion.circle
               key={`phase-${activePhase}`}
               cx="128"
@@ -86,7 +108,7 @@ export const BreathRing: React.FC<BreathRingProps> = ({
               animate={{ strokeDashoffset: 0 }}
               transition={{
                 duration: pitchDurationSec,
-                ease: "linear", // Fluid, non-stepping 60fps pitch progress
+                ease: 'linear', // Fluid, non-stepping 60fps pitch progress
               }}
             />
           )}
@@ -95,9 +117,9 @@ export const BreathRing: React.FC<BreathRingProps> = ({
         {/* Center Pitch & Status Overlay */}
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
           <span className={`text-[10px] tracking-widest font-bold uppercase ${
-            isHumming ? 'text-amber-400' : 'text-cyan-400'
+            isFree ? 'text-emerald-400' : isHumming ? 'text-amber-400' : 'text-cyan-400'
           }`}>
-            {isActive ? activePhase : "TAP TO BEGIN"}
+            {isActive ? (isFree ? 'FREE MODE' : activePhase) : 'TAP TO BEGIN'}
           </span>
 
           <div className="text-4xl font-extrabold text-white my-1">
@@ -105,9 +127,11 @@ export const BreathRing: React.FC<BreathRingProps> = ({
           </div>
 
           <span className="text-xs text-slate-400 font-medium">
-            {isActive && activeDegree
+            {isFree
+              ? 'Continuous Drone'
+              : isActive && activeDegree
               ? `Degree: [ ${activeDegree} ]`
-              : "Fundamental Pitch"}
+              : 'Fundamental Pitch'}
           </span>
         </div>
       </button>

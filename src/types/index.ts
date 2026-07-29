@@ -29,9 +29,13 @@ export interface PianoKey {
   degreeLabel?: string; // e.g. "1", "5"
 }
 
+export type DroneSource = 'synth' | 'tampura-1' | 'tampura-2';
+
 export interface AppState {
   rootNote: string;           // Fundamental pitch e.g. "C3"
   octave: number;             // Octave transposition e.g. 3
+  droneSource: DroneSource;
+  droneSampleVol: number;     // 0 to 1 scale
   droneRootVolume: number;    // 0 to 1 scale
   droneFifthVolume: number;   // 0 to 1 scale
   guideVolume: number;        // 0 to 1 scale

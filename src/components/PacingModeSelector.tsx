@@ -2,7 +2,7 @@ import React from 'react';
 import { Sliders, Wind } from 'lucide-react';
 import { TimingSettings } from './TimingSettingsModal';
 
-export type PacingPresetId = 'vagal-calm' | 'focus-theta' | 'sinus-recharge' | 'custom';
+export type PacingPresetId = 'vagal-calm' | 'focus-theta' | 'sinus-recharge' | 'free' | 'custom';
 
 export interface PacingModeSelectorProps {
   selectedMode: PacingPresetId;
@@ -17,7 +17,6 @@ export const PacingModeSelector = ({
   onSelectMode,
   customSettings,
   onOpenCustomModal,
-  sequenceNoteCount,
 }: PacingModeSelectorProps) => {
   const PRESETS: { id: PacingPresetId; name: string; subtitle: string; desc: string }[] = [
     {
@@ -38,6 +37,12 @@ export const PacingModeSelector = ({
       subtitle: 'NO Regeneration',
       desc: '4s / 10s / 180s',
     },
+    {
+      id: 'free',
+      name: 'Free Mode',
+      subtitle: 'Open Improvisation',
+      desc: 'Continuous Drone',
+    },
   ];
 
   // Calculate display string for custom card
@@ -55,7 +60,7 @@ export const PacingModeSelector = ({
         </h3>
       </div>
 
-      {/* 2x2 Grid of Pacing Mode Cards */}
+      {/* Grid of Pacing Mode Cards */}
       <div className="grid grid-cols-2 gap-2 pt-1">
         {/* Preset Cards */}
         {PRESETS.map((preset) => {
@@ -67,7 +72,9 @@ export const PacingModeSelector = ({
               onClick={() => onSelectMode(preset.id)}
               className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between cursor-pointer ${
                 isSelected
-                  ? 'bg-slate-800 border-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.2)] text-white'
+                  ? preset.id === 'free'
+                    ? 'bg-slate-800 border-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.2)] text-white'
+                    : 'bg-slate-800 border-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.2)] text-white'
                   : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:border-slate-700'
               }`}
             >
@@ -80,14 +87,14 @@ export const PacingModeSelector = ({
                 </span>
               </div>
 
-              <span className="text-[11px] font-mono font-semibold text-cyan-400">
+              <span className={`text-[11px] font-mono font-semibold ${preset.id === 'free' ? 'text-emerald-400' : 'text-cyan-400'}`}>
                 {preset.desc}
               </span>
             </button>
           );
         })}
 
-        {/* 4th Card: Dedicated "Custom Timing" Mode */}
+        {/* 5th Card: Dedicated "Custom Timing" Mode */}
         <div
           onClick={() => onSelectMode('custom')}
           className={`p-3 rounded-xl border text-left transition-all relative cursor-pointer flex flex-col justify-between ${

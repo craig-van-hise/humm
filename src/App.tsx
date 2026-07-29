@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   DEFAULT_SEQUENCE_PRESETS,
   SequenceSelector,
@@ -14,6 +14,7 @@ import { useAudioEngine } from './hooks/useAudioEngine';
 import { useSessionEngine } from './hooks/useSessionEngine';
 import { usePersistentState } from './hooks/usePersistentState';
 import { useWakeLock } from './hooks/useWakeLock';
+import { DroneSource } from './types';
 import { Sparkles, Clock } from 'lucide-react';
 import * as Tone from 'tone';
 
@@ -21,8 +22,9 @@ export function App() {
   // Persistent Calibration & Settings
   const [rootNote, setRootNote] = usePersistentState<string>('rootNote', 'C3');
   const [droneOctaveOffset, setDroneOctaveOffset] = usePersistentState<number>('droneOctaveOffset', -1);
+  const [droneSource, setDroneSource] = usePersistentState<DroneSource>('droneSource', 'synth');
 
-  // Acoustic Tone & Filter Settings (PRP #10 & #11)
+  // Acoustic Tone & Filter Settings
   const [droneRootWaveform, setDroneRootWaveform] = usePersistentState<Tone.ToneOscillatorType>('droneRootWaveform', 'sawtooth');
   const [droneRootFilterFreq, setDroneRootFilterFreq] = usePersistentState<number>('droneRootFilterFreq', 500);
   const [droneFifthWaveform, setDroneFifthWaveform] = usePersistentState<Tone.ToneOscillatorType>('droneFifthWaveform', 'triangle');
@@ -31,6 +33,7 @@ export function App() {
   const [guideFilterFreq, setGuideFilterFreq] = usePersistentState<number>('guideFilterFreq', 1000);
 
   // Audio State (0 to 1 scales)
+  const [droneSampleVol, setDroneSampleVol] = usePersistentState<number>('droneSampleVol', 0.7);
   const [droneRootVol, setDroneRootVol] = usePersistentState<number>('droneRootVol', 0.6);
   const [droneFifthVol, setDroneFifthVol] = usePersistentState<number>('droneFifthVol', 0.35);
   const [guideVol, setGuideVol] = usePersistentState<number>('guideVol', 0.9);
@@ -70,6 +73,8 @@ export function App() {
         return { inhaleSec: 3, restSec: 2, noteDurationSec: 1.2 };
       case 'sinus-recharge':
         return { inhaleSec: 4, restSec: 180, noteDurationSec: 2.0 };
+      case 'free':
+        return { inhaleSec: 0, restSec: 0, noteDurationSec: 0 };
       case 'custom':
         const noteDurationSec =
           timingSettings.mode === 'fixed-note'
@@ -85,20 +90,9 @@ export function App() {
 
   const activeTimings = getActiveTimings();
 
-  // Audio Engine Hook
-  const { playGuideNote, initEngine, startDrone, stopAllAudio } = useAudioEngine({
-    rootNote,
-    droneOctaveOffset,
-    droneRootVol,
-    droneFifthVol,
-    guideVol,
-    droneRootWaveform,
-    droneRootFilterFreq,
-    droneFifthWaveform,
-    droneFifthFilterFreq,
-    guideWaveform,
-    guideFilterFreq,
-  });
+  // Forward ref callbacks for session engine to audio engine binding
+  const playGuidePitchRef = useRef<(pitch: number | string, durationSec: number) => void>(() => {});
+  const stopAllAudioRef = useRef<() => void>(() => {});
 
   // Session State Engine Hook
   const session = useSessionEngine({
@@ -107,12 +101,39 @@ export function App() {
     inhaleSec: activeTimings.inhaleSec,
     restSec: activeTimings.restSec,
     noteDurationSec: activeTimings.noteDurationSec,
-    onPlayPitch: playGuideNote,
-    onStopAudio: stopAllAudio,
+    isFreeMode: selectedPacingMode === 'free',
+    onPlayPitch: (pitch, dur) => playGuidePitchRef.current(pitch, dur),
+    onStopAudio: () => stopAllAudioRef.current(),
+  });
+
+  const isSessionActive = session.activePhase !== 'ready';
+
+  // Audio Engine Hook (Receives active session state for live source switching)
+  const { playGuideNote, initEngine, startDrone, stopAllAudio } = useAudioEngine({
+    rootNote,
+    droneOctaveOffset,
+    droneSource,
+    droneSampleVol,
+    droneRootVol,
+    droneFifthVol,
+    guideVol,
+    isSessionActive,
+    droneRootWaveform,
+    droneRootFilterFreq,
+    droneFifthWaveform,
+    droneFifthFilterFreq,
+    guideWaveform,
+    guideFilterFreq,
+  });
+
+  // Assign refs
+  useEffect(() => {
+    playGuidePitchRef.current = playGuideNote;
+    stopAllAudioRef.current = stopAllAudio;
   });
 
   // Screen Wake Lock
-  useWakeLock(session.activePhase !== 'ready');
+  useWakeLock(isSessionActive);
 
   // Custom Presets Management
   const handleAddPreset = (newPreset: SequencePreset) => {
@@ -173,8 +194,8 @@ export function App() {
   const handleToggleSession = async () => {
     if (session.activePhase === 'ready') {
       await initEngine();
-      await startDrone();
       session.startSession();
+      await startDrone();
     } else {
       session.stopSession();
     }
@@ -239,18 +260,24 @@ export function App() {
         />
 
         {/* Melodic Sequence Presets */}
-        <SequenceSelector
-          presets={presets}
-          selectedId={selectedPreset.id}
-          onSelect={(id) => setSelectedPresetId(id)}
-          onAddPreset={handleAddPreset}
-          onEditPreset={handleEditPreset}
-          onDeletePreset={handleDeletePreset}
-          onResetDefaults={handleResetDefaults}
-        />
+        <div className={selectedPacingMode === 'free' ? 'opacity-40 pointer-events-none transition-opacity' : 'transition-opacity'}>
+          <SequenceSelector
+            presets={presets}
+            selectedId={selectedPreset.id}
+            onSelect={(id) => setSelectedPresetId(id)}
+            onAddPreset={handleAddPreset}
+            onEditPreset={handleEditPreset}
+            onDeletePreset={handleDeletePreset}
+            onResetDefaults={handleResetDefaults}
+          />
+        </div>
 
         {/* Audio Mix Controls */}
         <AudioControls
+          droneSource={droneSource}
+          setDroneSource={setDroneSource}
+          droneSampleVol={droneSampleVol}
+          setDroneSampleVol={setDroneSampleVol}
           droneOctaveOffset={droneOctaveOffset}
           setDroneOctaveOffset={setDroneOctaveOffset}
           droneRootVol={droneRootVol}
@@ -298,4 +325,3 @@ export function App() {
     </div>
   );
 }
-

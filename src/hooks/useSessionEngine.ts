@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { degreeToFrequency, degreeToNoteName } from '../utils/pitchMath';
 
-export type SessionPhase = 'ready' | 'inhale' | 'humming' | 'resting';
+export type SessionPhase = 'ready' | 'inhale' | 'humming' | 'resting' | 'free';
 
 interface SessionEngineConfig {
   rootNote: string;
@@ -9,6 +9,7 @@ interface SessionEngineConfig {
   inhaleSec: number;
   restSec: number;
   noteDurationSec: number;
+  isFreeMode?: boolean;
   onPlayPitch: (pitch: number | string, durationSec: number) => void;
   onStopAudio: () => void;
 }
@@ -19,6 +20,7 @@ export function useSessionEngine({
   inhaleSec,
   restSec,
   noteDurationSec,
+  isFreeMode = false,
   onPlayPitch,
   onStopAudio,
 }: SessionEngineConfig) {
@@ -111,8 +113,15 @@ export function useSessionEngine({
   // 3. Start Session
   const startSession = useCallback(() => {
     isRunningRef.current = true;
-    startPhase('inhale');
-  }, [startPhase]);
+    if (isFreeMode) {
+      clearAllTimers();
+      setActivePhase('free');
+      setActiveNoteName(null);
+      setActiveDegree(null);
+    } else {
+      startPhase('inhale');
+    }
+  }, [isFreeMode, startPhase, clearAllTimers]);
 
   // 4. Stop Session (Instant Termination)
   const stopSession = useCallback(() => {

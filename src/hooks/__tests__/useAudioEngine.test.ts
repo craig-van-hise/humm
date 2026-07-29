@@ -16,7 +16,8 @@ vi.mock('tone', () => {
 
   function MockGain(this: any) {
     this.toDestination = vi.fn().mockReturnThis();
-    this.gain = { rampTo: vi.fn() };
+    this.connect = vi.fn().mockReturnThis();
+    this.gain = { rampTo: vi.fn(), setValueAtTime: vi.fn() };
     this.dispose = vi.fn();
   }
 
@@ -33,6 +34,15 @@ vi.mock('tone', () => {
     this.frequency = { setValueAtTime: vi.fn(), rampTo: vi.fn() };
   }
 
+  function MockPlayer(this: any) {
+    this.connect = vi.fn().mockReturnThis();
+    this.start = vi.fn();
+    this.stop = vi.fn();
+    this.dispose = vi.fn();
+    this.loaded = true;
+    this.playbackRate = 1;
+  }
+
   function MockFrequency() {
     return {
       toMidi: () => 60,
@@ -46,8 +56,10 @@ vi.mock('tone', () => {
     Gain: vi.fn().mockImplementation(function(this: any) { MockGain.call(this); }),
     Filter: vi.fn().mockImplementation(function(this: any) { MockFilter.call(this); }),
     OmniOscillator: vi.fn().mockImplementation(function(this: any) { MockOmniOscillator.call(this); }),
+    Player: vi.fn().mockImplementation(function(this: any) { MockPlayer.call(this); }),
     Frequency: MockFrequency,
     start: vi.fn().mockResolvedValue(undefined),
+    loaded: vi.fn().mockResolvedValue(undefined),
   };
 });
 

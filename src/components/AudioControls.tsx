@@ -1,7 +1,12 @@
 import React from 'react';
-import { Volume2, Music, Settings } from 'lucide-react';
+import { Volume2, Music, Settings, Disc } from 'lucide-react';
+import { DroneSource } from '../types';
 
 interface AudioControlsProps {
+  droneSource: DroneSource;
+  setDroneSource: (source: DroneSource) => void;
+  droneSampleVol: number;
+  setDroneSampleVol: (vol: number) => void;
   droneOctaveOffset: number;
   setDroneOctaveOffset: (offset: number) => void;
   droneRootVol: number;
@@ -14,6 +19,10 @@ interface AudioControlsProps {
 }
 
 export const AudioControls: React.FC<AudioControlsProps> = ({
+  droneSource,
+  setDroneSource,
+  droneSampleVol,
+  setDroneSampleVol,
   droneOctaveOffset,
   setDroneOctaveOffset,
   droneRootVol,
@@ -24,6 +33,8 @@ export const AudioControls: React.FC<AudioControlsProps> = ({
   setGuideVol,
   onOpenToneSettings,
 }) => {
+  const isSynth = droneSource === 'synth';
+
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-4 shadow-xl">
       <div className="flex justify-between items-center border-b border-slate-800 pb-2">
@@ -31,7 +42,7 @@ export const AudioControls: React.FC<AudioControlsProps> = ({
           <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
           Acoustic Tone Mixer
         </h3>
-        {onOpenToneSettings && (
+        {isSynth && onOpenToneSettings && (
           <button
             onClick={onOpenToneSettings}
             className="p-1 rounded-lg text-slate-400 hover:text-cyan-400 hover:bg-slate-800 transition-colors cursor-pointer flex items-center gap-1 text-[11px] font-medium"
@@ -43,28 +54,31 @@ export const AudioControls: React.FC<AudioControlsProps> = ({
         )}
       </div>
 
-      {/* Drone Octave Selector */}
+      {/* Drone Sound Source Selector */}
       <div className="space-y-1.5">
         <label className="text-xs text-slate-300 font-medium flex justify-between">
-          <span>Drone Octave Placement</span>
+          <span className="flex items-center gap-1">
+            <Disc className="w-3 h-3 text-cyan-400" />
+            Drone Sound Source
+          </span>
           <span className="text-[10px] text-cyan-400 font-mono">
-            {droneOctaveOffset === -1 ? "-1 Octave (Recommended)" : droneOctaveOffset === -2 ? "-2 Octaves" : "Unison (0)"}
+            {droneSource === 'synth' ? 'Synthesizer' : droneSource === 'tampura-1' ? 'Tampura 1 (WAV)' : 'Tampura 2 (MP3)'}
           </span>
         </label>
-        
+
         <div className="grid grid-cols-3 gap-1.5 bg-slate-950 p-1 rounded-lg border border-slate-800">
           {[
-            { label: "-2 Oct", value: -2 },
-            { label: "-1 Oct (Default)", value: -1 },
-            { label: "Unison (0)", value: 0 },
+            { label: 'Synth', value: 'synth' as const },
+            { label: 'Tampura 1', value: 'tampura-1' as const },
+            { label: 'Tampura 2', value: 'tampura-2' as const },
           ].map((opt) => (
             <button
               key={opt.value}
-              onClick={() => setDroneOctaveOffset(opt.value)}
-              className={`text-xs py-1 px-2 rounded-md font-medium transition-colors ${
-                droneOctaveOffset === opt.value
-                  ? "bg-cyan-500 text-slate-950 font-bold shadow"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800"
+              onClick={() => setDroneSource(opt.value)}
+              className={`text-xs py-1 px-2 rounded-md font-medium transition-colors cursor-pointer ${
+                droneSource === opt.value
+                  ? 'bg-cyan-500 text-slate-950 font-bold shadow'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
               }`}
             >
               {opt.label}
@@ -73,39 +87,91 @@ export const AudioControls: React.FC<AudioControlsProps> = ({
         </div>
       </div>
 
-      {/* Slider 1: Drone Fundamental (Filtered Sawtooth) */}
-      <div className="space-y-1 pt-1">
-        <div className="flex justify-between text-xs text-slate-300">
-          <span>Drone Fundamental (Warm Pad)</span>
-          <span className="font-mono text-cyan-400">{Math.round(droneRootVol * 100)}%</span>
-        </div>
-        <input
-          type="range"
-          min="0"
-          max="1"
-          step="0.01"
-          value={droneRootVol}
-          onChange={(e) => setDroneRootVol(parseFloat(e.target.value))}
-          className="w-full accent-cyan-400 bg-slate-800 h-1.5 rounded-lg appearance-none cursor-pointer"
-        />
-      </div>
+      {/* Synth Controls vs Sample Volume Control */}
+      {isSynth ? (
+        <>
+          {/* Drone Octave Selector */}
+          <div className="space-y-1.5">
+            <label className="text-xs text-slate-300 font-medium flex justify-between">
+              <span>Drone Octave Placement</span>
+              <span className="text-[10px] text-cyan-400 font-mono">
+                {droneOctaveOffset === -1 ? '-1 Octave (Recommended)' : droneOctaveOffset === -2 ? '-2 Octaves' : 'Unison (0)'}
+              </span>
+            </label>
 
-      {/* Slider 2: Drone Perfect 5th */}
-      <div className="space-y-1">
-        <div className="flex justify-between text-xs text-slate-300">
-          <span>Drone Perfect 5th (Harmonic Ground)</span>
-          <span className="font-mono text-sky-400">{Math.round(droneFifthVol * 100)}%</span>
+            <div className="grid grid-cols-3 gap-1.5 bg-slate-950 p-1 rounded-lg border border-slate-800">
+              {[
+                { label: '-2 Oct', value: -2 },
+                { label: '-1 Oct (Default)', value: -1 },
+                { label: 'Unison (0)', value: 0 },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setDroneOctaveOffset(opt.value)}
+                  className={`text-xs py-1 px-2 rounded-md font-medium transition-colors cursor-pointer ${
+                    droneOctaveOffset === opt.value
+                      ? 'bg-cyan-500 text-slate-950 font-bold shadow'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Slider 1: Drone Fundamental (Filtered Sawtooth) */}
+          <div className="space-y-1 pt-1">
+            <div className="flex justify-between text-xs text-slate-300">
+              <span>Drone Fundamental (Warm Pad)</span>
+              <span className="font-mono text-cyan-400">{Math.round(droneRootVol * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={droneRootVol}
+              onChange={(e) => setDroneRootVol(parseFloat(e.target.value))}
+              className="w-full accent-cyan-400 bg-slate-800 h-1.5 rounded-lg appearance-none cursor-pointer"
+            />
+          </div>
+
+          {/* Slider 2: Drone Perfect 5th */}
+          <div className="space-y-1">
+            <div className="flex justify-between text-xs text-slate-300">
+              <span>Drone Perfect 5th (Harmonic Ground)</span>
+              <span className="font-mono text-sky-400">{Math.round(droneFifthVol * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={droneFifthVol}
+              onChange={(e) => setDroneFifthVol(parseFloat(e.target.value))}
+              className="w-full accent-sky-400 bg-slate-800 h-1.5 rounded-lg appearance-none cursor-pointer"
+            />
+          </div>
+        </>
+      ) : (
+        /* Sample Loop Volume Slider */
+        <div className="space-y-1 pt-1">
+          <div className="flex justify-between text-xs text-slate-300">
+            <span>Tampura Sample Drone Volume</span>
+            <span className="font-mono text-cyan-400">{Math.round(droneSampleVol * 100)}%</span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={droneSampleVol}
+            onChange={(e) => setDroneSampleVol(parseFloat(e.target.value))}
+            className="w-full accent-cyan-400 bg-slate-800 h-1.5 rounded-lg appearance-none cursor-pointer"
+          />
         </div>
-        <input
-          type="range"
-          min="0"
-          max="1"
-          step="0.01"
-          value={droneFifthVol}
-          onChange={(e) => setDroneFifthVol(parseFloat(e.target.value))}
-          className="w-full accent-sky-400 bg-slate-800 h-1.5 rounded-lg appearance-none cursor-pointer"
-        />
-      </div>
+      )}
 
       {/* Slider 3: Guide Tone Pitch (Soft Triangle) */}
       <div className="space-y-1 border-t border-slate-800/60 pt-2">
