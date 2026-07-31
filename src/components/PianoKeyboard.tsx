@@ -10,9 +10,17 @@ interface PianoKeyboardProps {
 
 const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
+export const BLACK_KEY_OCTAVE_OFFSETS: Record<string, number> = {
+  'C#': 13.5,
+  'D#': 29.3,
+  'F#': 55.8,
+  'G#': 71.43,
+  'A#': 87.0,
+};
+
 export const getOctave = (note: string) => {
   const match = note.match(/^([A-G]#?)(-?\d+)$/);
-  return match ? parseInt(match[2], 10) : 3;
+  return match ? parseInt(match[2], 10) : 2;
 };
 
 export const generateKeysForOctave = (baseOctave: number) => {
@@ -32,7 +40,7 @@ export const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
   onSelectRoot,
 }) => {
   // Local state for visual octave layout (decoupled from rootNote pitch selection)
-  const [keyboardOctave, setKeyboardOctave] = useState(() => getOctave(rootNote));
+  const [keyboardOctave, setKeyboardOctave] = useState<number>(2);
 
   const shiftKeyboardOctave = (delta: number) => {
     setKeyboardOctave((prev) => Math.max(2, Math.min(5, prev + delta)));
@@ -43,16 +51,18 @@ export const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
 
   // Split into white and black key structures for rendering
   const whiteKeys: { note: string; index: number }[] = [];
-  const blackKeys: { note: string; whiteIndex: number }[] = [];
+  const blackKeys: { note: string; name: string; octaveIndex: number }[] = [];
 
   let whiteIndex = -1;
-  keys.forEach((note) => {
+  keys.forEach((note, idx) => {
     const isBlack = note.includes('#');
     if (!isBlack) {
       whiteIndex++;
       whiteKeys.push({ note, index: whiteIndex });
     } else {
-      blackKeys.push({ note, whiteIndex });
+      const name = note.replace(/\d+$/, '');
+      const octaveIndex = idx < 12 ? 0 : 1;
+      blackKeys.push({ note, name, octaveIndex });
     }
   });
 
@@ -100,20 +110,10 @@ export const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
         </div>
       </div>
 
-      {/* Peak Resonance Highlight Banner */}
-      {isResonanceZone && (
-        <div className="mb-3 px-3 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center gap-2 text-xs text-emerald-300">
-          <Sparkles className="w-4 h-4 text-emerald-400 shrink-0 animate-pulse" />
-          <span>
-            <strong>Peak Sinus NO Zone (130-150 Hz):</strong> Maximum paranasal nitric oxide release target.
-          </span>
-        </div>
-      )}
-
       {/* 2-Octave Static Piano Keyboard Container */}
-      <div className="relative w-full h-36 bg-slate-950 rounded-xl p-2 border border-slate-800 shadow-inner overflow-hidden">
+      <div className="relative w-full h-36 bg-slate-950 rounded-xl p-2 border border-slate-800 shadow-inner overflow-hidden" data-testid="keyboard-container">
         {/* White Keys Layer */}
-        <div className="flex w-full h-full gap-[2px]">
+        <div className="flex w-full h-full">
           {whiteKeys.map(({ note }) => {
             const isRoot = note === rootNote;
             const isActive = note === activeNote;
@@ -124,12 +124,12 @@ export const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
                 data-note={note}
                 data-testid={`key-${note}`}
                 onClick={() => onSelectRoot(note)}
-                className={`flex-1 rounded-b-md flex flex-col justify-end pb-2 items-center transition-colors relative cursor-pointer ${
+                className={`flex-1 min-w-0 rounded-b-md flex flex-col justify-end pb-2 items-center transition-colors relative cursor-pointer ${
                   isActive
-                    ? "bg-amber-300 text-slate-950 font-bold border-2 border-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.8)]"
+                    ? "bg-amber-300 text-slate-950 font-bold border border-amber-500 ring-1 ring-inset ring-amber-500 shadow-[0_0_12px_rgba(251,191,36,0.8)]"
                     : isRoot
-                    ? "bg-cyan-100 text-slate-900 font-bold border-2 border-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.6)]"
-                    : "bg-white text-slate-800 hover:bg-slate-100"
+                    ? "bg-cyan-100 text-slate-900 font-bold border border-cyan-500 ring-1 ring-inset ring-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.6)]"
+                    : "bg-white text-slate-800 hover:bg-slate-100 border border-slate-300 shadow-sm"
                 }`}
               >
                 {isRoot && <span className="w-2 h-2 rounded-full bg-cyan-500 mb-1" />}
@@ -140,10 +140,11 @@ export const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
         </div>
 
         {/* Black Keys Layer */}
-        {blackKeys.map(({ note, whiteIndex }) => {
+        {blackKeys.map(({ note, name, octaveIndex }) => {
           const isRoot = note === rootNote;
           const isActive = note === activeNote;
-          const leftPercent = ((whiteIndex + 1) / totalWhite) * 100;
+          const basePercent = BLACK_KEY_OCTAVE_OFFSETS[name] ?? 50;
+          const leftPercent = (octaveIndex * 50) + (basePercent * 0.5);
 
           return (
             <button
@@ -154,14 +155,14 @@ export const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
               style={{
                 left: `${leftPercent}%`,
                 transform: "translateX(-50%)",
-                width: `${(1 / totalWhite) * 65}%`,
+                width: "4.3%",
               }}
               className={`absolute top-2 h-20 rounded-b-md z-10 flex flex-col justify-end pb-2 items-center transition-colors cursor-pointer ${
                 isActive
-                  ? "bg-amber-400 text-slate-950 font-bold shadow-[0_0_12px_rgba(251,191,36,0.8)]"
+                  ? "bg-amber-400 text-slate-950 font-bold border-2 border-amber-300 shadow-[0_0_12px_rgba(251,191,36,0.8)]"
                   : isRoot
-                  ? "bg-cyan-600 text-white font-bold shadow-[0_0_10px_rgba(6,182,212,0.6)]"
-                  : "bg-slate-950 text-slate-300 hover:bg-slate-800 border border-slate-800"
+                  ? "bg-cyan-600 text-white font-bold border-2 border-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.6)]"
+                  : "bg-slate-950 text-slate-300 hover:bg-slate-800 border-2 border-slate-800"
               }`}
             >
               {isRoot && <span className="w-1.5 h-1.5 rounded-full bg-cyan-300 mb-1" />}
@@ -170,6 +171,16 @@ export const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
           );
         })}
       </div>
+
+      {/* Peak Resonance Highlight Banner */}
+      {isResonanceZone && (
+        <div className="mt-3 px-3 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center gap-2 text-xs text-emerald-300" data-testid="peak-sinus-banner">
+          <Sparkles className="w-4 h-4 text-emerald-400 shrink-0 animate-pulse" />
+          <span>
+            <strong>Peak Sinus NO Zone (130-150 Hz):</strong> Maximum paranasal nitric oxide release target.
+          </span>
+        </div>
+      )}
     </div>
   );
 };

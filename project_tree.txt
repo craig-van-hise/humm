@@ -5,14 +5,22 @@
 |  ├── ## Project- Humm — Mobile Web App.md
 |  └── Therapeutic Humming Science Research.pdf
 ├── # PRPs
-|  ├── # 0.md
-|  ├── # 1.md
-|  ├── # 2.md
-|  ├── # 3.md
-|  ├── # 4.md
-|  ├── # 5.md
-|  ├── # 6.md
-|  └── # 7.md
+|  ├── # 11.md
+|  ├── # 12.md
+|  ├── # 13.md
+|  └── xOlder
+|     ├── # 0.md
+|     ├── # 1.md
+|     ├── # 10.md
+|     ├── # 2.md
+|     ├── # 3.md
+|     ├── # 4.md
+|     ├── # 5.md
+|     ├── # 6.md
+|     ├── # 7.md
+|     ├── # 8.md
+|     └── # 9.md
+├── PROJECT_CONTEXT_BUNDLE.md
 ├── PROJECT_STATE.md
 ├── README.md
 ├── index.html
@@ -22,6 +30,8 @@
 ├── postcss.config.js
 ├── project_tree.txt
 ├── public
+|  ├── 342968__iternetcone__tanpura-c.wav
+|  ├── 416766__xavip2p__tampura-13610hz.mp3
 |  └── manifest.webmanifest
 ├── src
 |  ├── App.tsx
@@ -30,10 +40,20 @@
 |  |  ├── BreathRing.tsx
 |  |  ├── PacingModeSelector.tsx
 |  |  ├── PianoKeyboard.tsx
-|  |  ├── PitchPicker.tsx
 |  |  ├── SequenceSelector.tsx
-|  |  └── TimingSettingsModal.tsx
+|  |  ├── TimingSettingsModal.tsx
+|  |  ├── ToneSettingsModal.tsx
+|  |  └── __tests__
+|  |     ├── PianoKeyboard.test.tsx
+|  |     └── ToneSettingsModal.test.tsx
 |  ├── hooks
+|  |  ├── __tests__
+|  |  |  ├── useAudioEngine.test.ts
+|  |  |  ├── useAudioEngineInitGain.test.ts
+|  |  |  ├── useAudioEngineSampleLoop.test.ts
+|  |  |  ├── useAudioEngineStability.test.ts
+|  |  |  ├── useAudioEngineTone.test.ts
+|  |  |  └── useSessionEngineFreeMode.test.ts
 |  |  ├── useAudioEngine.ts
 |  |  ├── usePersistentState.ts
 |  |  ├── useSessionEngine.ts
@@ -49,9 +69,9 @@
 ├── tsconfig.json
 └── vite.config.ts
 
-directory: 524 file: 4095
+directory: 787 file: 5424
 
-ignored: directory (40)
+ignored: directory (86)
 
 
 [2K[1G

@@ -13,18 +13,15 @@ Humm is a minimalist, mobile-first web application designed to pair the physiolo
 - [## Project- Humm — Mobile Web App.md](file:///Users/vv2024/Documents/Repos%20-%20vv2024/Humm/%23%20Foundational%20Docs/%23%23%20Project-%20Humm%20%E2%80%94%20Mobile%20Web%20App.md): Core vision and product overview.
 
 ## Product Requirement Packages (PRPs)
-- [PRP #0 - Foundation](file:///Users/vv2024/Documents/Repos%20-%20vv2024/Humm/%23%20PRPs/%23%200.md)
-- [PRP #1 - Audio Engine & Pitch Math](file:///Users/vv2024/Documents/Repos%20-%20vv2024/Humm/%23%20PRPs/%23%201.md)
-- [PRP #2 - Piano Keyboard & Pitch Picker](file:///Users/vv2024/Documents/Repos%20-%20vv2024/Humm/%23%20PRPs/%23%202.md)
-- [PRP #3 - Breath Visualizer & Sequence Selector](file:///Users/vv2024/Documents/Repos%20-%20vv2024/Humm/%23%20PRPs/%23%203.md)
-- [PRP #4 - Data Persistence & Acoustic Mixer](file:///Users/vv2024/Documents/Repos%20-%20vv2024/Humm/%23%20PRPs/%23%204.md)
-- [PRP #5 - Custom Timings & Pacing Controls](file:///Users/vv2024/Documents/Repos%20-%20vv2024/Humm/%23%20PRPs/%23%205.md)
-- [PRP #6 - Pacing Selector & Instant Audio Stop](file:///Users/vv2024/Documents/Repos%20-%20vv2024/Humm/%23%20PRPs/%23%206.md)
-- [PRP #7 - Session Engine Hook & Phase Orchestrator](file:///Users/vv2024/Documents/Repos%20-%20vv2024/Humm/%23%20PRPs/%23%207.md)
+- [PRP #0 - #10 (Archived)](file:///Users/vv2024/Documents/Repos%20-%20vv2024/Humm/%23%20PRPs/xOlder)
+- [PRP #11 - Custom Timings](file:///Users/vv2024/Documents/Repos%20-%20vv2024/Humm/%23%20PRPs/%23%2011.md)
+- [PRP #12 - Tonal Shaping for Synths](file:///Users/vv2024/Documents/Repos%20-%20vv2024/Humm/%23%20PRPs/%23%2012.md)
+- [PRP #13 - Tampura & Free Mode](file:///Users/vv2024/Documents/Repos%20-%20vv2024/Humm/%23%20PRPs/%23%2013.md)
 
 ## Key Source Code Locations
 - Audio Engine: [src/hooks/useAudioEngine.ts](file:///Users/vv2024/Documents/Repos%20-%20vv2024/Humm/src/hooks/useAudioEngine.ts)
 - Session Engine: [src/hooks/useSessionEngine.ts](file:///Users/vv2024/Documents/Repos%20-%20vv2024/Humm/src/hooks/useSessionEngine.ts)
+- Tone Settings Modal: [src/components/ToneSettingsModal.tsx](file:///Users/vv2024/Documents/Repos%20-%20vv2024/Humm/src/components/ToneSettingsModal.tsx)
 - Pitch Calculations: [src/utils/pitchMath.ts](file:///Users/vv2024/Documents/Repos%20-%20vv2024/Humm/src/utils/pitchMath.ts)
 - Persistent State: [src/hooks/usePersistentState.ts](file:///Users/vv2024/Documents/Repos%20-%20vv2024/Humm/src/hooks/usePersistentState.ts)
 - Main Component: [src/App.tsx](file:///Users/vv2024/Documents/Repos%20-%20vv2024/Humm/src/App.tsx)

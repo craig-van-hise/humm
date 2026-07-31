@@ -33,15 +33,16 @@
 ```
 .
 ├── # Foundational Docs/   # Architecture and scientific specification sheets
-├── # PRPs/                # Product Requirement Packages (#0 through #7)
-├── public/                # Web app manifest and static assets
+├── # PRPs/                # Product Requirement Packages (#11 through #13, xOlder/#0-#10)
+├── public/                # Web app manifest, Tampura audio assets, and static assets
 ├── src/
-│   ├── components/        # AudioControls, BreathRing, PacingModeSelector, PianoKeyboard, PitchPicker, SequenceSelector, TimingSettingsModal
+│   ├── components/        # AudioControls, BreathRing, PacingModeSelector, PianoKeyboard, SequenceSelector, TimingSettingsModal, ToneSettingsModal
 │   ├── hooks/             # useAudioEngine, usePersistentState, useSessionEngine, useWakeLock
 │   ├── types/             # Type definitions
 │   ├── utils/             # audioContext, pitchMath
 │   ├── App.tsx            # Main application layout and state integration
 │   └── main.tsx           # React DOM root entry
+├── PROJECT_CONTEXT_BUNDLE.md # Consolidated agent context bundle
 ├── PROJECT_STATE.md       # Detailed system state & capability map
 └── llms.txt               # LLM documentation index
 ```

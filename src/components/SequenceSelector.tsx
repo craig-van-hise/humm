@@ -37,6 +37,11 @@ export const DEFAULT_BREATH_MODES: BreathMode[] = [
 
 export const DEFAULT_SEQUENCE_PRESETS: SequencePreset[] = [
   {
+    id: 'surround_tonic',
+    name: 'Surround the Tonic',
+    degrees: ['1', '2', '1', '7v', '1', '1'],
+  },
+  {
     id: 'micro_tuning',
     name: 'Gentle Micro-Tuning',
     degrees: ['1', 'b2', '1', 'b3', '1'],
